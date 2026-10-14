@@ -3,6 +3,7 @@ import { reencodeToJpeg } from '../lib/image.js';
 import { receiptFilename } from '../lib/filenames.js';
 import { parseAmountToCents, centsToInput } from '../lib/money.js';
 import ConfirmInline from './ConfirmInline.jsx';
+import DocViewer from './DocViewer.jsx';
 
 function todayStr() {
   const d = new Date();
@@ -53,8 +54,11 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const [previewUrl, setPreviewUrl] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const photoRef = useRef(null);
+  const viewerOpenRef = useRef(false);
+  viewerOpenRef.current = viewerOpen;
   const date = receipt?.date || todayStr();
 
   // New mode: open the camera immediately.
@@ -85,7 +89,10 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   // Escape closes.
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // When the viewer is open, Escape closes the viewer, not the sheet.
+      if (viewerOpenRef.current) return;
+      onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -126,6 +133,13 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
 
   const showThumb = previewUrl && (imageBlob || (isEdit && existingFile));
 
+  // The image to open full-screen: the fresh capture, else the saved file.
+  const viewerFile = imageBlob
+    ? { blob: imageBlob, name: filename, mimeType: 'image/jpeg', kind: 'photo' }
+    : isEdit && existingFile
+    ? existingFile
+    : null;
+
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div
@@ -149,7 +163,14 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
           <div className="receipt-photo">
             {showThumb ? (
               <>
-                <img src={previewUrl} alt="Receipt" className="receipt-photo-img" />
+                <button
+                  type="button"
+                  className="receipt-photo-btn"
+                  onClick={() => viewerFile && setViewerOpen(true)}
+                  aria-label="Open photo full screen"
+                >
+                  <img src={previewUrl} alt="Receipt" className="receipt-photo-img" />
+                </button>
                 <button
                   type="button"
                   className="btn btn-ghost retake-btn"
@@ -252,6 +273,10 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
           hidden
           onChange={onPhotoPicked}
         />
+
+        {viewerOpen && viewerFile && (
+          <DocViewer file={viewerFile} onClose={() => setViewerOpen(false)} />
+        )}
       </div>
     </div>
   );
