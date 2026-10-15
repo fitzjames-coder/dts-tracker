@@ -41,9 +41,13 @@ export async function shareFiles(fileRows) {
 
   let files;
   try {
+    // Build each File from a synchronous copy of the bytes. WebKit can leave the
+    // original IndexedDB-backed Blob unreadable after navigator.share, so we
+    // never hand that original to the share sheet. slice() is sync, so the
+    // tap's user activation is preserved.
     files = fileRows.map(
       (r) =>
-        new File([r.blob], r.name || 'file', {
+        new File([r.blob.slice()], r.name || 'file', {
           type: r.mimeType || 'application/octet-stream',
         })
     );

@@ -4,6 +4,7 @@ import DocCapture from './DocCapture.jsx';
 import BlockForm from './BlockForm.jsx';
 import ConfirmInline from './ConfirmInline.jsx';
 import DocViewer from './DocViewer.jsx';
+import CropScreen from './CropScreen.jsx';
 import { BackupButton } from './ExportButton.jsx';
 
 const CODE_PREFIXES = ['Confirmation:', 'TANUM:', 'SATO ticket:'];
@@ -116,12 +117,14 @@ export default function Block({
   onDeleteFile,
   onBackupFiles,
   onToggleDocsOpen,
+  onReplaceFileBlob,
 }) {
   const [editing, setEditing] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState(false);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState(null);
   const [viewerFile, setViewerFile] = useState(null);
+  const [cropSource, setCropSource] = useState(null); // raw camera file awaiting crop
 
   const openTodos = todos.filter((t) => !t.done).length;
   const allDone = todos.length > 0 && openTodos === 0;
@@ -258,8 +261,10 @@ export default function Block({
           {capturing ? (
             <DocCapture
               onPick={(file, source) => {
-                onAddDoc(block.id, file, source);
                 setCapturing(false);
+                // Camera photos go through crop first; uploads/PDFs do not.
+                if (source === 'photo') setCropSource(file);
+                else onAddDoc(block.id, file, source);
               }}
               onCancel={() => setCapturing(false)}
             />
@@ -299,15 +304,28 @@ export default function Block({
         (() => {
           // Use the live file row so the viewer's backup state stays current.
           const live = files.find((f) => f.id === viewerFile.id) || viewerFile;
+          const isImage = (live.mimeType || '').startsWith('image/');
           return (
             <DocViewer
               file={live}
               saved={live.syncState === 'saved'}
               onBackup={() => onBackupFiles([live])}
+              onCrop={isImage ? (blob) => onReplaceFileBlob(live.id, blob) : undefined}
               onClose={() => setViewerFile(null)}
             />
           );
         })()}
+
+      {cropSource && (
+        <CropScreen
+          source={cropSource}
+          onDone={(blob) => {
+            onAddDoc(block.id, blob, 'photo-processed');
+            setCropSource(null);
+          }}
+          onCancel={() => setCropSource(null)}
+        />
+      )}
     </section>
   );
 }

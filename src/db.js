@@ -228,6 +228,39 @@ export async function deleteFile(id) {
   await db.files.delete(id);
 }
 
+/** Read one file row fresh from IndexedDB (used to recover a poisoned blob). */
+export async function getFile(id) {
+  return db.files.get(id);
+}
+
+/**
+ * Replace a file's image with a cropped JPEG. Because the bytes changed, the
+ * file is marked not-backed-up again (syncState 'local', savedAt null). If the
+ * name doesn't already end in .jpg, switch the extension to .jpg and keep it
+ * unique among the other files.
+ */
+export async function replaceFileBlob(id, blob) {
+  return db.transaction('rw', db.files, async () => {
+    const f = await db.files.get(id);
+    if (!f) return;
+    let name = f.name;
+    if (!/\.jpg$/i.test(name)) {
+      const base = name.replace(/\.[^.]+$/, '');
+      const others = await db.files.toArray();
+      const names = new Set(others.filter((x) => x.id !== id).map((x) => x.name));
+      name = uniqueName(base + '.jpg', names, '-');
+    }
+    await db.files.update(id, {
+      blob,
+      size: blob.size,
+      mimeType: 'image/jpeg',
+      name,
+      syncState: 'local',
+      savedAt: null,
+    });
+  });
+}
+
 /**
  * Mark files as backed up ("saved") in one transaction, stamping savedAt.
  * @param {string[]} ids
