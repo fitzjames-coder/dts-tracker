@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { reencodeToJpeg } from '../lib/image.js';
 import { receiptFilename } from '../lib/filenames.js';
 import { parseAmountToCents, centsToInput } from '../lib/money.js';
 import ConfirmInline from './ConfirmInline.jsx';
 import DocViewer from './DocViewer.jsx';
+import CropScreen from './CropScreen.jsx';
 import { BackupButton } from './ExportButton.jsx';
 
 function todayStr() {
@@ -46,7 +46,7 @@ const HINTS = {
   fuel: 'fuel + voucher',
 };
 
-export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onSaveNew, onSaveEdit, onDelete, onBackupFiles }) {
+export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onSaveNew, onSaveEdit, onDelete, onBackupFiles, onReplaceFileBlob }) {
   const isEdit = mode === 'edit';
   const [title, setTitle] = useState(receipt?.title || '');
   const [tag, setTag] = useState(receipt?.tag || 'other');
@@ -54,12 +54,12 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const [imageBlob, setImageBlob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [cropSource, setCropSource] = useState(null); // raw camera file awaiting crop
 
   const photoRef = useRef(null);
-  const viewerOpenRef = useRef(false);
-  viewerOpenRef.current = viewerOpen;
+  const overlayOpenRef = useRef(false);
+  overlayOpenRef.current = viewerOpen || cropSource != null;
   const date = receipt?.date || todayStr();
 
   // New mode: open the camera immediately.
@@ -91,24 +91,27 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   useEffect(() => {
     function onKey(e) {
       if (e.key !== 'Escape') return;
-      // When the viewer is open, Escape closes the viewer, not the sheet.
-      if (viewerOpenRef.current) return;
+      // When an overlay (viewer or crop) is open, Escape closes it, not the sheet.
+      if (overlayOpenRef.current) return;
       onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  async function onPhotoPicked() {
+  function onPhotoPicked() {
     const file = photoRef.current && photoRef.current.files && photoRef.current.files[0];
     if (photoRef.current) photoRef.current.value = '';
     if (!file) return;
-    setBusy(true);
-    const blob = await reencodeToJpeg(file);
+    // The captured photo goes through crop first; the result becomes the photo.
+    setCropSource(file);
+  }
+
+  function onCropDone(blob) {
     if (previewUrl && imageBlob) URL.revokeObjectURL(previewUrl);
     setImageBlob(blob);
     setPreviewUrl(URL.createObjectURL(blob));
-    setBusy(false);
+    setCropSource(null);
   }
 
   const amountCents = parseAmountToCents(amount);
@@ -185,9 +188,8 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
                 type="button"
                 className="photo-placeholder"
                 onClick={() => photoRef.current && photoRef.current.click()}
-                disabled={busy}
               >
-                {busy ? 'Processing…' : 'Take photo'}
+                Take photo
               </button>
             )}
 
@@ -292,7 +294,22 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
             onBackup={
               viewerFile.id && onBackupFiles ? () => onBackupFiles([viewerFile]) : undefined
             }
+            onCrop={
+              viewerFile.id &&
+              onReplaceFileBlob &&
+              (viewerFile.mimeType || '').startsWith('image/')
+                ? (blob) => onReplaceFileBlob(viewerFile.id, blob)
+                : undefined
+            }
             onClose={() => setViewerOpen(false)}
+          />
+        )}
+
+        {cropSource && (
+          <CropScreen
+            source={cropSource}
+            onDone={onCropDone}
+            onCancel={() => setCropSource(null)}
           />
         )}
       </div>

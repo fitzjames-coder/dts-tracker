@@ -15,6 +15,7 @@ import {
   addFile,
   deleteFile,
   markFilesSaved,
+  replaceFileBlob,
 } from './db.js';
 import { reencodeToJpeg } from './lib/image.js';
 import { formatCents, centsToInput } from './lib/money.js';
@@ -224,7 +225,17 @@ export default function App() {
   const onAddDoc = (blockId, file, source) =>
     act(async () => {
       let fileRow;
-      if (source === 'photo') {
+      if (source === 'photo-processed') {
+        // Already a finished JPEG from CropScreen — store as-is, don't re-encode.
+        fileRow = {
+          kind: 'photo',
+          numbered: true,
+          ext: 'jpg',
+          mimeType: 'image/jpeg',
+          size: file.size,
+          blob: file,
+        };
+      } else if (source === 'photo') {
         // Camera capture -> numbered <BlockWord>-<n>.jpg (db assigns the name).
         const blob = await reencodeToJpeg(file);
         fileRow = {
@@ -253,6 +264,7 @@ export default function App() {
     });
 
   const onDeleteDoc = (id) => act(() => deleteFile(id));
+  const onReplaceFileBlob = (id, blob) => act(() => replaceFileBlob(id, blob));
 
   const onSaveNewReceipt = (fields, fileRow) =>
     act(async () => {
@@ -363,6 +375,7 @@ export default function App() {
                 onAddDoc={onAddDoc}
                 onDeleteFile={onDeleteDoc}
                 onBackupFiles={onBackupFiles}
+                onReplaceFileBlob={onReplaceFileBlob}
               />
             ))}
 
@@ -388,6 +401,7 @@ export default function App() {
           onSaveEdit={onSaveEditReceipt}
           onDelete={onDeleteReceipt}
           onBackupFiles={onBackupFiles}
+          onReplaceFileBlob={onReplaceFileBlob}
         />
       )}
 
