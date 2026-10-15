@@ -27,7 +27,7 @@ import BlockForm from './components/BlockForm.jsx';
 import ReceiptSheet from './components/ReceiptSheet.jsx';
 import TodoSheet from './components/TodoSheet.jsx';
 import BackupSheet from './components/BackupSheet.jsx';
-import ExportButton from './components/ExportButton.jsx';
+import ExportButton, { UNLOCK_SCROLL_KEY } from './components/ExportButton.jsx';
 
 export default function App() {
   const [trip, setTrip] = useState(null);
@@ -46,6 +46,7 @@ export default function App() {
   const [navTodoBlockId, setNavTodoBlockId] = useState(null);
 
   const persistedRef = useRef(false);
+  const scrollRestoredRef = useRef(false);
 
   const reload = useCallback(async (tripId) => {
     const data = await loadAll(tripId);
@@ -63,6 +64,22 @@ export default function App() {
       setLoading(false);
     })();
   }, [reload]);
+
+  // After an unlock reload, restore the scroll position once data has loaded.
+  useEffect(() => {
+    if (loading || scrollRestoredRef.current) return;
+    scrollRestoredRef.current = true;
+    try {
+      const v = sessionStorage.getItem(UNLOCK_SCROLL_KEY);
+      if (v != null) {
+        sessionStorage.removeItem(UNLOCK_SCROLL_KEY);
+        const y = parseInt(v, 10);
+        if (Number.isFinite(y)) requestAnimationFrame(() => window.scrollTo(0, y));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [loading]);
 
   // Request persistent storage on the first user action.
   const ensurePersist = useCallback(async () => {
@@ -198,6 +215,7 @@ export default function App() {
   const onUpdateBlock = (id, data) => act(() => updateBlock(id, data));
   const onDeleteBlock = (id) => act(() => deleteBlock(id));
   const onToggleBlockOpen = (id, open) => act(() => updateBlock(id, { open }));
+  const onToggleDocsOpen = (id, docsOpen) => act(() => updateBlock(id, { docsOpen }));
 
   const onAddTodo = (blockId, text) => act(() => addTodo(blockId, text));
   const onToggleTodo = (id, done) => act(() => updateTodo(id, { done }));
@@ -230,6 +248,8 @@ export default function App() {
         };
       }
       await addFile(trip.id, blockId, fileRow);
+      // A newly added file opens the block's Documents section.
+      await updateBlock(blockId, { docsOpen: true });
     });
 
   const onDeleteDoc = (id) => act(() => deleteFile(id));
@@ -334,6 +354,7 @@ export default function App() {
                 expanded={searching ? true : b.open}
                 forceTodoOpen={navTodoBlockId === b.id}
                 onToggleOpen={onToggleBlockOpen}
+                onToggleDocsOpen={onToggleDocsOpen}
                 onUpdate={onUpdateBlock}
                 onDelete={onDeleteBlock}
                 onAddTodo={onAddTodo}

@@ -115,6 +115,7 @@ export default function Block({
   onAddDoc,
   onDeleteFile,
   onBackupFiles,
+  onToggleDocsOpen,
 }) {
   const [editing, setEditing] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -125,6 +126,8 @@ export default function Block({
   const openTodos = todos.filter((t) => !t.done).length;
   const allDone = todos.length > 0 && openTodos === 0;
   const lineCount = (block.lines || []).length;
+  const unsavedDocs = files.filter((f) => f.syncState !== 'saved').length;
+  const docsOpen = !!block.docsOpen;
 
   if (editing) {
     return (
@@ -188,48 +191,68 @@ export default function Block({
           />
 
           {files.length > 0 && (
-            <ul className="doc-chips">
-              {files.map((f) => (
-                <li key={f.id} className="doc-chip">
-                  <button
-                    type="button"
-                    className="doc-chip-open"
-                    onClick={() => setViewerFile(f)}
-                    aria-label={`Open ${f.name}`}
-                  >
-                    <span className="doc-chip-icon">
-                      <DocKindIcon kind={f.kind} />
-                    </span>
-                    <span className="doc-chip-name">{f.name}</span>
-                  </button>
-                  <BackupButton
-                    saved={f.syncState === 'saved'}
-                    onBackup={() => onBackupFiles([f])}
-                  />
-                  <button
-                    type="button"
-                    className="doc-chip-del"
-                    onClick={() => setConfirmDeleteFile(f.id)}
-                    aria-label="Delete document"
-                  >
-                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                      <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+            <div className={'todo-sub' + (unsavedDocs > 0 ? ' todo-sub-active' : '')}>
+              <button
+                type="button"
+                className="todo-sub-header"
+                onClick={() => onToggleDocsOpen(block.id, !docsOpen)}
+                aria-expanded={docsOpen}
+              >
+                <Chevron open={docsOpen} />
+                <span className="todo-sub-title">Documents</span>
+                {unsavedDocs > 0 && (
+                  <span className="pill pill-danger">{unsavedDocs} not saved</span>
+                )}
+                <span className="todo-sub-count">{files.length} files</span>
+              </button>
 
-          {confirmFileTarget && (
-            <ConfirmInline
-              message={`Delete document “${confirmFileTarget.name}”?`}
-              onConfirm={() => {
-                onDeleteFile(confirmFileTarget.id);
-                setConfirmDeleteFile(null);
-              }}
-              onCancel={() => setConfirmDeleteFile(null)}
-            />
+              {docsOpen && (
+                <div className="todo-sub-body">
+                  <ul className="doc-chips">
+                    {files.map((f) => (
+                      <li key={f.id} className="doc-chip">
+                        <button
+                          type="button"
+                          className="doc-chip-open"
+                          onClick={() => setViewerFile(f)}
+                          aria-label={`Open ${f.name}`}
+                        >
+                          <span className="doc-chip-icon">
+                            <DocKindIcon kind={f.kind} />
+                          </span>
+                          <span className="doc-chip-name">{f.name}</span>
+                        </button>
+                        <BackupButton
+                          saved={f.syncState === 'saved'}
+                          onBackup={() => onBackupFiles([f])}
+                        />
+                        <button
+                          type="button"
+                          className="doc-chip-del"
+                          onClick={() => setConfirmDeleteFile(f.id)}
+                          aria-label="Delete document"
+                        >
+                          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {confirmFileTarget && (
+                    <ConfirmInline
+                      message={`Delete document “${confirmFileTarget.name}”?`}
+                      onConfirm={() => {
+                        onDeleteFile(confirmFileTarget.id);
+                        setConfirmDeleteFile(null);
+                      }}
+                      onCancel={() => setConfirmDeleteFile(null)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {capturing ? (

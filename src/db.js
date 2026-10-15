@@ -61,6 +61,7 @@ export async function addBlock(tripId, { title, lines }) {
     order: minOrder - 1,
     open: true,
     todoOpen: true,
+    docsOpen: false,
     nextFileNo: 1,
     createdAt: now(),
     updatedAt: now(),

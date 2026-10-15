@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { shareFiles, getShareLog } from '../lib/share.js';
+import { shareFiles } from '../lib/share.js';
 import { buildReceiptsCsv, csvFilename } from '../lib/csv.js';
 
 // This file is the shared, dependency-cycle-free home for the backup controls
@@ -8,6 +8,21 @@ import { buildReceiptsCsv, csvFilename } from '../lib/csv.js';
 // (BackupSheet imports DocViewer, DocViewer imports these).
 
 const UNSUPPORTED_MSG = 'This browser can’t save files — update Chrome.';
+
+// sessionStorage key used to restore scroll position across an unlock reload.
+// App.jsx reads it on start. Shared here so there is a single source of truth.
+export const UNLOCK_SCROLL_KEY = 'dts-unlock-scroll';
+
+// iOS blocks navigator.share after the first completed Save to Files until the
+// page reloads. The unlock button reloads, preserving the scroll position.
+function unlockSharing() {
+  try {
+    sessionStorage.setItem(UNLOCK_SCROLL_KEY, String(window.scrollY || 0));
+  } catch {
+    /* ignore */
+  }
+  location.reload();
+}
 
 function SmallTick() {
   return (
@@ -41,35 +56,51 @@ function SaveShareIcon() {
   );
 }
 
-// DEBUG-SHARE: format one share-log record for the on-screen diagnostics line.
-function diagLine(taps, rec) {
-  if (!rec) return `taps=${taps}`;
-  return `taps=${taps} #${rec.seq} invoked=${rec.invoked ? 'yes' : 'no'} status=${rec.status} err=${rec.errorName || '-'} ${rec.ms}ms`;
+// Open padlock (shackle swung clear of the body).
+function UnlockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <rect x="4" y="11" width="12" height="9" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 11V7a4 4 0 017.9-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UnlockButton() {
+  return (
+    <button
+      type="button"
+      className="backup-btn backup-btn-icon unlock-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        unlockSharing();
+      }}
+      aria-label="Unlock sharing"
+    >
+      <UnlockIcon />
+    </button>
+  );
 }
 
 /**
- * The single save/share control. Tapping it ALWAYS opens the share sheet
- * (saved or not). Red "Save" when not backed up, green "Saved" with a tick
- * once backed up. Status only flips to saved when the share completes.
+ * The single save/share control, icon only. Tapping it ALWAYS opens the share
+ * sheet. Red when not backed up, green with a tick once backed up. Status only
+ * flips to saved when the share completes ("done"). When iOS blocks the share
+ * ("blocked"), an Unlock button appears next to it.
  *
- * onBackup resolves to { status, errorName }. There is deliberately no local
- * busy flag — serialisation lives in shareFiles so a button can never get
- * stuck "in flight" after a re-render.
+ * onBackup resolves to { status, errorName }. No local busy flag — serialisation
+ * lives in shareFiles so a button can never get stuck "in flight".
  * @param {{saved: boolean, onBackup: () => Promise<{status:string,errorName:string}>, full?: boolean}} props
  */
 export function BackupButton({ saved, onBackup, full }) {
-  const [note, setNote] = useState(null); // null | 'unsupported' | {failed: errorName}
-  const [taps, setTaps] = useState(0); // DEBUG-SHARE
-  const [diag, setDiag] = useState(null); // DEBUG-SHARE
+  const [note, setNote] = useState(null); // null | 'unsupported' | 'blocked' | {failed}
 
   async function handle(e) {
-    setTaps((t) => t + 1); // DEBUG-SHARE: count raw taps before anything else
     e.stopPropagation();
     setNote(null); // clears on every tap
     const res = (await onBackup()) || {};
-    const log = getShareLog(); // DEBUG-SHARE
-    setDiag(log[log.length - 1] || null); // DEBUG-SHARE
     if (res.status === 'unsupported') setNote('unsupported');
+    else if (res.status === 'blocked') setNote('blocked');
     else if (res.status === 'failed') setNote({ failed: res.errorName || 'error' });
     // 'done' / 'cancelled' leave no note.
   }
@@ -93,14 +124,13 @@ export function BackupButton({ saved, onBackup, full }) {
           </span>
         )}
       </button>
+      {note === 'blocked' && <UnlockButton />}
       {note === 'unsupported' && <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>}
       {note && note.failed && (
         <span className="backup-unsupported">
           Couldn’t open the share sheet ({note.failed}) — tap again.
         </span>
       )}
-      {/* DEBUG-SHARE */}
-      <span className="share-diag">{diagLine(taps, diag)}</span>
     </>
   );
 }
@@ -134,13 +164,10 @@ export default function ExportButton({
   perDiemUsed,
   fuelUsed,
 }) {
-  const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'failed'
+  const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'blocked', 'failed'
   const [errName, setErrName] = useState('');
-  const [taps, setTaps] = useState(0); // DEBUG-SHARE
-  const [diag, setDiag] = useState(null); // DEBUG-SHARE
 
   async function onExport() {
-    setTaps((t) => t + 1); // DEBUG-SHARE: count raw taps before anything else
     setStatus(''); // clears any prior message on each tap (sync; keeps activation)
     const csv = buildReceiptsCsv({
       trip,
@@ -158,13 +185,13 @@ export default function ExportButton({
       return;
     }
     const res = (await shareFiles([file])) || {};
-    const log = getShareLog(); // DEBUG-SHARE
-    setDiag(log[log.length - 1] || null); // DEBUG-SHARE
     if (res.status === 'done') {
       setStatus('exported');
       setTimeout(() => setStatus((s) => (s === 'exported' ? '' : s)), 2000);
     } else if (res.status === 'unsupported') {
       setStatus('unsupported');
+    } else if (res.status === 'blocked') {
+      setStatus('blocked');
     } else if (res.status === 'failed') {
       setErrName(res.errorName || 'error');
       setStatus('failed');
@@ -173,9 +200,12 @@ export default function ExportButton({
 
   return (
     <div className="export-wrap">
-      <button type="button" className="export-btn" onClick={onExport}>
-        {status === 'exported' ? 'Exported' : 'Export numbers (CSV)'}
-      </button>
+      <div className="export-row">
+        <button type="button" className="export-btn" onClick={onExport}>
+          {status === 'exported' ? 'Exported' : 'Export numbers (CSV)'}
+        </button>
+        {status === 'blocked' && <UnlockButton />}
+      </div>
       {status === 'unsupported' && (
         <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>
       )}
@@ -184,8 +214,6 @@ export default function ExportButton({
           Couldn’t open the share sheet ({errName}) — tap again.
         </span>
       )}
-      {/* DEBUG-SHARE */}
-      <span className="share-diag">{diagLine(taps, diag)}</span>
     </div>
   );
 }
