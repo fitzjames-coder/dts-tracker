@@ -117,6 +117,23 @@ textarea {
   gap: 10px;
 }
 
+/* Full-width amber "refresh before your next save" bar, under the top row. */
+.unlock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: var(--warn);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-weight: 650;
+  font-size: 14px;
+  min-height: 44px;
+}
+
 .trip-line {
   display: flex;
   align-items: center;

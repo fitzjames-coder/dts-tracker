@@ -14,8 +14,8 @@ const UNSUPPORTED_MSG = 'This browser can’t save files — update Chrome.';
 export const UNLOCK_SCROLL_KEY = 'dts-unlock-scroll';
 
 // iOS blocks navigator.share after the first completed Save to Files until the
-// page reloads. The unlock button reloads, preserving the scroll position.
-function unlockSharing() {
+// page reloads. Unlock reloads, preserving the scroll position.
+export function unlockSharing() {
   try {
     sessionStorage.setItem(UNLOCK_SCROLL_KEY, String(window.scrollY || 0));
   } catch {
@@ -101,8 +101,9 @@ export function BackupButton({ saved, onBackup, full }) {
     const res = (await onBackup()) || {};
     if (res.status === 'unsupported') setNote('unsupported');
     else if (res.status === 'blocked') setNote('blocked');
+    else if (res.status === 'done') setNote('unlock'); // refresh before the next save
     else if (res.status === 'failed') setNote({ failed: res.errorName || 'error' });
-    // 'done' / 'cancelled' leave no note.
+    // 'cancelled' leaves no note.
   }
 
   return (
@@ -124,7 +125,7 @@ export function BackupButton({ saved, onBackup, full }) {
           </span>
         )}
       </button>
-      {note === 'blocked' && <UnlockButton />}
+      {(note === 'blocked' || note === 'unlock') && <UnlockButton />}
       {note === 'unsupported' && <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>}
       {note && note.failed && (
         <span className="backup-unsupported">
@@ -163,9 +164,11 @@ export default function ExportButton({
   voucherUsed,
   perDiemUsed,
   fuelUsed,
+  onSaved,
 }) {
   const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'blocked', 'failed'
   const [errName, setErrName] = useState('');
+  const [unlock, setUnlock] = useState(false); // show Unlock until a reload
 
   async function onExport() {
     setStatus(''); // clears any prior message on each tap (sync; keeps activation)
@@ -188,6 +191,8 @@ export default function ExportButton({
     if (res.status === 'done') {
       setStatus('exported');
       setTimeout(() => setStatus((s) => (s === 'exported' ? '' : s)), 2000);
+      setUnlock(true); // refresh before the next save
+      if (onSaved) onSaved();
     } else if (res.status === 'unsupported') {
       setStatus('unsupported');
     } else if (res.status === 'blocked') {
@@ -204,7 +209,7 @@ export default function ExportButton({
         <button type="button" className="export-btn" onClick={onExport}>
           {status === 'exported' ? 'Exported' : 'Export numbers (CSV)'}
         </button>
-        {status === 'blocked' && <UnlockButton />}
+        {(status === 'blocked' || unlock) && <UnlockButton />}
       </div>
       {status === 'unsupported' && (
         <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>
