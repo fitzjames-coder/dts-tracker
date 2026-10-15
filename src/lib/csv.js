@@ -1,8 +1,10 @@
 import { slugify } from './filenames.js';
+import { fileDate } from '../db.js';
 
-// Build the CSV export of a trip's numbers. UTF-8 with a BOM so Excel opens
-// it cleanly; comma separated; every text field quoted; amounts are plain
-// numbers with 2 decimals derived from the integer cents in the db.
+// Build the CSV export of a trip. UTF-8 with a BOM so Excel opens it cleanly;
+// comma separated; every text field quoted; amounts are plain numbers with 2
+// decimals derived from the integer cents in the db. Images can't go in a CSV,
+// so file names are listed instead.
 
 const BOM = '﻿';
 const EOL = '\r\n';
@@ -48,10 +50,13 @@ const COUNTS_AGAINST = {
 
 /**
  * @param {{
- *   trip: {name: string, voucherCents: number, perDiemCents: number, fuelCents: number},
+ *   trip: object,
  *   receipts: Array<object>,
  *   voucherUsed: number, perDiemUsed: number, fuelUsed: number,
- *   fileById: Record<string, {syncState?: string}>,
+ *   fileById: Record<string, object>,
+ *   blocks: Array<object>,                 in on-screen order
+ *   todosByBlock: Record<string, Array>,   to-dos per block, in order
+ *   filesByBlock: Record<string, Array>,   files per block, in order
  * }} data
  * @returns {string} CSV text (with BOM)
  */
@@ -62,11 +67,16 @@ export function buildReceiptsCsv({
   perDiemUsed,
   fuelUsed,
   fileById = {},
+  blocks = [],
+  todosByBlock = {},
+  filesByBlock = {},
 }) {
   const rows = [];
 
   rows.push([q('DTS Tracker export')]);
   rows.push([q('Trip'), q(trip?.name || '')]);
+  rows.push([q('From'), q(trip?.startDate || '')]);
+  rows.push([q('To'), q(trip?.endDate || '')]);
   rows.push([q('Exported'), q(nowStamp())]);
   rows.push([]);
 
@@ -91,12 +101,15 @@ export function buildReceiptsCsv({
   ]);
   rows.push([]);
 
+  // --- Receipts ---
   rows.push([
     q('Date'),
     q('Title'),
     q('Tag'),
     q('Amount'),
     q('Counts against'),
+    q('Location'),
+    q('Photo file'),
     q('Backed up'),
   ]);
 
@@ -117,12 +130,47 @@ export function buildReceiptsCsv({
       q(TAG_LABEL[r.tag] || 'Other'),
       hasAmount ? money(r.amountCents) : '', // blank cell when empty
       q(COUNTS_AGAINST[r.tag] || 'Voucher only'),
+      q(r.location || ''),
+      q(file ? file.name : ''),
       q(backedUp),
     ]);
   }
 
   rows.push([]);
   rows.push([q('Receipts total'), money(total)]);
+  rows.push([]);
+
+  // --- Blocks ---
+  rows.push([q('Blocks')]);
+  rows.push([q('Block'), q('Type'), q('Item'), q('Status'), q('Date'), q('Location')]);
+
+  for (const b of blocks) {
+    const title = b.title || '';
+    const lines = b.lines || [];
+    const todos = todosByBlock[b.id] || [];
+    const bfiles = filesByBlock[b.id] || [];
+
+    if (!lines.length && !todos.length && !bfiles.length) {
+      rows.push([q(title), q('(empty)'), '', '', '', '']);
+      continue;
+    }
+    for (const line of lines) {
+      rows.push([q(title), q('Line'), q(line), '', '', '']);
+    }
+    for (const t of todos) {
+      rows.push([q(title), q('To do'), q(t.text), q(t.done ? 'Done' : 'Open'), '', '']);
+    }
+    for (const f of bfiles) {
+      rows.push([
+        q(title),
+        q('File'),
+        q(f.name),
+        q(f.syncState === 'saved' ? 'Backed up' : 'Not backed up'),
+        q(fileDate(f)),
+        q(f.location || ''),
+      ]);
+    }
+  }
 
   return BOM + rows.map((cells) => cells.join(',')).join(EOL) + EOL;
 }

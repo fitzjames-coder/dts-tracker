@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { shareFiles } from '../lib/share.js';
-import { buildReceiptsCsv, csvFilename } from '../lib/csv.js';
 
 // This file is the shared, dependency-cycle-free home for the backup controls
 // as well as the CSV export button. Keeping BackupButton/BackupDot here lets
@@ -154,36 +153,19 @@ export function BackupDot({ saved, onBackup }) {
 
 /**
  * Full-width "Export numbers (CSV)" button that sits at the very bottom of the
- * page. Builds the CSV and hands it to the share sheet (so it can go straight
- * to Save to Files). Shows "Exported" briefly on success.
+ * page. Builds the CSV (via makeCsvFile) and hands it to the share sheet.
+ * Shows "Exported" briefly on success.
  */
-export default function ExportButton({
-  trip,
-  receipts,
-  fileById,
-  voucherUsed,
-  perDiemUsed,
-  fuelUsed,
-  onSaved,
-}) {
+export default function ExportButton({ makeCsvFile, onSaved }) {
   const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'blocked', 'failed'
   const [errName, setErrName] = useState('');
   const [unlock, setUnlock] = useState(false); // show Unlock until a reload
 
   async function onExport() {
     setStatus(''); // clears any prior message on each tap (sync; keeps activation)
-    const csv = buildReceiptsCsv({
-      trip,
-      receipts,
-      voucherUsed,
-      perDiemUsed,
-      fuelUsed,
-      fileById,
-    });
-    const name = csvFilename(trip?.name);
     let file;
     try {
-      file = { blob: new Blob([csv], { type: 'text/csv' }), name, mimeType: 'text/csv' };
+      file = makeCsvFile();
     } catch {
       return;
     }

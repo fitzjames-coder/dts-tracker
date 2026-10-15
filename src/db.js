@@ -21,6 +21,27 @@ db.version(1).stores({
 const uid = () => crypto.randomUUID();
 const now = () => Date.now();
 
+const pad = (n) => String(n).padStart(2, '0');
+
+/** Local date as "YYYY-MM-DD". */
+export function todayLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * A file's effective date: its stored date, else its createdAt as YYYY-MM-DD,
+ * else "". Used everywhere a file's date is shown or exported.
+ */
+export function fileDate(file) {
+  if (file && file.date) return file.date;
+  if (file && file.createdAt) {
+    const d = new Date(file.createdAt);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  return '';
+}
+
 // --- Trip -----------------------------------------------------------------
 
 /** Ensure exactly one trip exists; create it on first launch. Returns it. */
@@ -33,6 +54,8 @@ export async function ensureTrip() {
     voucherCents: 0,
     perDiemCents: 0,
     fuelCents: 0,
+    startDate: null,
+    endDate: null,
     createdAt: now(),
   };
   await db.trips.add(trip);
@@ -140,6 +163,8 @@ export async function addReceipt(tripId, fields, fileRow) {
         mimeType: fileRow.mimeType,
         size: fileRow.size,
         blob: fileRow.blob,
+        date: fields.date || todayLocal(),
+        location: '',
         createdAt: now(),
         syncState: 'local',
         savedAt: null,
@@ -153,6 +178,7 @@ export async function addReceipt(tripId, fields, fileRow) {
       tag: fields.tag || 'other',
       amountCents: fields.amountCents ?? null,
       date: fields.date,
+      location: fields.location || '',
       fileId,
     });
   });
@@ -213,6 +239,8 @@ export async function addFile(tripId, blockId, fileRow) {
       mimeType: fileRow.mimeType,
       size: fileRow.size,
       blob: fileRow.blob,
+      date: todayLocal(),
+      location: '',
       createdAt: now(),
       syncState: 'local',
       savedAt: null,
@@ -221,6 +249,11 @@ export async function addFile(tripId, blockId, fileRow) {
     await db.files.add(file);
     return file;
   });
+}
+
+/** Update a file's editable metadata (date, location). Backup state unchanged. */
+export async function updateFile(id, changes) {
+  await db.files.update(id, changes);
 }
 
 /** Delete a single document (file row and its blob). */
@@ -272,6 +305,19 @@ export async function markFilesSaved(ids) {
     for (const id of ids) {
       await db.files.update(id, { syncState: 'saved', savedAt });
     }
+  });
+}
+
+/** Wipe the whole database (trips, blocks, todos, receipts, files) in one txn. */
+export async function wipeAll() {
+  await db.transaction('rw', db.trips, db.blocks, db.todos, db.receipts, db.files, async () => {
+    await Promise.all([
+      db.trips.clear(),
+      db.blocks.clear(),
+      db.todos.clear(),
+      db.receipts.clear(),
+      db.files.clear(),
+    ]);
   });
 }
 

@@ -41,6 +41,7 @@ export default function TodoList({ todos, forceOpen, onAdd, onToggle, onDelete }
   const [confirmId, setConfirmId] = useState(null);
 
   const effectiveOpen = open || forceOpen;
+  const hasTodos = todos.length > 0;
   const openCount = todos.filter((t) => !t.done).length;
   const hasOpen = openCount > 0;
 
@@ -63,9 +64,11 @@ export default function TodoList({ todos, forceOpen, onAdd, onToggle, onDelete }
       >
         <Chevron open={effectiveOpen} />
         <span className="todo-sub-title">To do</span>
-        <span className={'todo-sub-count' + (hasOpen ? ' todo-sub-count-open' : '')}>
-          {hasOpen ? `${openCount} open` : 'all done'}
-        </span>
+        {hasTodos && (
+          <span className={'todo-sub-count' + (hasOpen ? ' todo-sub-count-open' : '')}>
+            {hasOpen ? `${openCount} open` : 'all done'}
+          </span>
+        )}
       </button>
 
       {effectiveOpen && (
