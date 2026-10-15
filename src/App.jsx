@@ -14,9 +14,11 @@ import {
   deleteReceipt,
   addFile,
   deleteFile,
+  markFilesSaved,
 } from './db.js';
 import { reencodeToJpeg } from './lib/image.js';
 import { formatCents, centsToInput } from './lib/money.js';
+import { shareFiles } from './lib/share.js';
 import TopBar from './components/TopBar.jsx';
 import BudgetTiles from './components/BudgetTiles.jsx';
 import ReceiptsBlock from './components/ReceiptsBlock.jsx';
@@ -24,11 +26,8 @@ import Block from './components/Block.jsx';
 import BlockForm from './components/BlockForm.jsx';
 import ReceiptSheet from './components/ReceiptSheet.jsx';
 import TodoSheet from './components/TodoSheet.jsx';
-
-function withJpgExt(name) {
-  const base = (name || 'photo').replace(/\.[^.]+$/, '').trim() || 'photo';
-  return base + '.jpg';
-}
+import BackupSheet from './components/BackupSheet.jsx';
+import ExportButton, { UNLOCK_SCROLL_KEY } from './components/ExportButton.jsx';
 
 export default function App() {
   const [trip, setTrip] = useState(null);
@@ -43,9 +42,11 @@ export default function App() {
   const [addingBlock, setAddingBlock] = useState(false);
   const [receiptSheet, setReceiptSheet] = useState(null); // { mode, receipt }
   const [todoSheetOpen, setTodoSheetOpen] = useState(false);
+  const [backupSheetOpen, setBackupSheetOpen] = useState(false);
   const [navTodoBlockId, setNavTodoBlockId] = useState(null);
 
   const persistedRef = useRef(false);
+  const scrollRestoredRef = useRef(false);
 
   const reload = useCallback(async (tripId) => {
     const data = await loadAll(tripId);
@@ -63,6 +64,22 @@ export default function App() {
       setLoading(false);
     })();
   }, [reload]);
+
+  // After an unlock reload, restore the scroll position once data has loaded.
+  useEffect(() => {
+    if (loading || scrollRestoredRef.current) return;
+    scrollRestoredRef.current = true;
+    try {
+      const v = sessionStorage.getItem(UNLOCK_SCROLL_KEY);
+      if (v != null) {
+        sessionStorage.removeItem(UNLOCK_SCROLL_KEY);
+        const y = parseInt(v, 10);
+        if (Number.isFinite(y)) requestAnimationFrame(() => window.scrollTo(0, y));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [loading]);
 
   // Request persistent storage on the first user action.
   const ensurePersist = useCallback(async () => {
@@ -131,9 +148,26 @@ export default function App() {
     [receipts]
   );
 
-  const localFileCount = useMemo(
-    () => files.filter((f) => f.syncState === 'local').length,
+  const unsavedCount = useMemo(
+    () => files.filter((f) => f.syncState !== 'saved').length,
     [files]
+  );
+  const allSaved = unsavedCount === 0;
+
+  // Back up files through the OS share sheet. shareFiles must run straight from
+  // the tap (no await before it) or iOS drops the activation navigator.share
+  // needs — so ensurePersist is fired without awaiting.
+  const onBackupFiles = useCallback(
+    async (fileRows) => {
+      ensurePersist();
+      const res = await shareFiles(fileRows);
+      if (res.status === 'done') {
+        await markFilesSaved(fileRows.map((f) => f.id));
+        await refresh();
+      }
+      return res; // { status, errorName }
+    },
+    [ensurePersist, refresh]
   );
 
   // --- Search ---------------------------------------------------------------
@@ -181,6 +215,7 @@ export default function App() {
   const onUpdateBlock = (id, data) => act(() => updateBlock(id, data));
   const onDeleteBlock = (id) => act(() => deleteBlock(id));
   const onToggleBlockOpen = (id, open) => act(() => updateBlock(id, { open }));
+  const onToggleDocsOpen = (id, docsOpen) => act(() => updateBlock(id, { docsOpen }));
 
   const onAddTodo = (blockId, text) => act(() => addTodo(blockId, text));
   const onToggleTodo = (id, done) => act(() => updateTodo(id, { done }));
@@ -190,25 +225,31 @@ export default function App() {
     act(async () => {
       let fileRow;
       if (source === 'photo') {
+        // Camera capture -> numbered <BlockWord>-<n>.jpg (db assigns the name).
         const blob = await reencodeToJpeg(file);
         fileRow = {
           kind: 'photo',
-          name: withJpgExt(file.name),
+          numbered: true,
+          ext: 'jpg',
           mimeType: 'image/jpeg',
           size: blob.size,
           blob,
         };
       } else {
+        // Uploaded file -> keep its original name (db dedupes if needed).
         const isPdf = file.type === 'application/pdf';
         fileRow = {
           kind: isPdf ? 'pdf' : 'upload',
-          name: file.name || (isPdf ? 'document.pdf' : 'upload'),
+          numbered: false,
+          originalName: file.name || (isPdf ? 'document.pdf' : 'upload'),
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
           blob: file,
         };
       }
       await addFile(trip.id, blockId, fileRow);
+      // A newly added file opens the block's Documents section.
+      await updateBlock(blockId, { docsOpen: true });
     });
 
   const onDeleteDoc = (id) => act(() => deleteFile(id));
@@ -250,12 +291,14 @@ export default function App() {
       <header className="header">
         <TopBar
           trip={trip}
-          localFileCount={localFileCount}
+          allSaved={allSaved}
+          unsavedCount={unsavedCount}
           persistWarn={persistWarn}
           search={search}
           onSearch={setSearch}
           openTodoCount={openTodoCount}
           onOpenTodos={() => setTodoSheetOpen(true)}
+          onOpenBackup={() => setBackupSheetOpen(true)}
           onNewReceipt={() => {
             ensurePersist();
             setReceiptSheet({ mode: 'new', receipt: null });
@@ -278,7 +321,9 @@ export default function App() {
           <>
             <ReceiptsBlock
               receipts={visibleReceipts}
+              fileById={fileById}
               onOpenReceipt={(r) => setReceiptSheet({ mode: 'edit', receipt: r })}
+              onBackupFiles={onBackupFiles}
             />
 
             {!searching &&
@@ -309,6 +354,7 @@ export default function App() {
                 expanded={searching ? true : b.open}
                 forceTodoOpen={navTodoBlockId === b.id}
                 onToggleOpen={onToggleBlockOpen}
+                onToggleDocsOpen={onToggleDocsOpen}
                 onUpdate={onUpdateBlock}
                 onDelete={onDeleteBlock}
                 onAddTodo={onAddTodo}
@@ -316,8 +362,18 @@ export default function App() {
                 onDeleteTodo={onDeleteTodo}
                 onAddDoc={onAddDoc}
                 onDeleteFile={onDeleteDoc}
+                onBackupFiles={onBackupFiles}
               />
             ))}
+
+            <ExportButton
+              trip={trip}
+              receipts={receipts}
+              fileById={fileById}
+              voucherUsed={voucherUsed}
+              perDiemUsed={perDiemUsed}
+              fuelUsed={fuelUsed}
+            />
           </>
         )}
       </main>
@@ -331,6 +387,16 @@ export default function App() {
           onSaveNew={onSaveNewReceipt}
           onSaveEdit={onSaveEditReceipt}
           onDelete={onDeleteReceipt}
+          onBackupFiles={onBackupFiles}
+        />
+      )}
+
+      {backupSheetOpen && (
+        <BackupSheet
+          blocks={blocks}
+          files={files}
+          onBackupFiles={onBackupFiles}
+          onClose={() => setBackupSheetOpen(false)}
         />
       )}
 

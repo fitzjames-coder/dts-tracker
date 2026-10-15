@@ -1368,10 +1368,6 @@ textarea {
   border-top: 1px solid var(--line);
 }
 
-.doc-viewer-share {
-  width: 100%;
-}
-
 /* --- PDF pages (pdf.js) --------------------------------------------------- */
 
 /* In PDF mode the body scrolls vertically and stacks pages from the top. */
@@ -1436,4 +1432,239 @@ textarea {
   text-align: center;
   background: var(--surface);
   border-top: 1px solid var(--line);
+}
+
+/* --- Backup controls ------------------------------------------------------ */
+
+.backup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+/* Icon-only square control (no text), with room for the corner tick badge. */
+.backup-btn-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  overflow: visible;
+}
+
+.backup-btn-unsaved {
+  background: var(--danger);
+}
+
+.backup-btn-saved {
+  background: var(--ok);
+}
+
+.backup-btn-full {
+  width: 44px;
+  height: 44px;
+}
+
+/* White tick badge in the top-right corner when saved. */
+.backup-tick {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ok);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1.5px var(--ok);
+}
+
+.backup-tick svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Unlock button: same square shape as the save button, amber background. */
+.unlock-btn {
+  background: var(--warn);
+  width: 40px;
+  height: 40px;
+}
+
+.backup-unsupported {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  font-size: 12px;
+  color: var(--warn);
+  margin-top: 4px;
+}
+
+.backup-dot {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.backup-dot-unsaved {
+  background: var(--danger);
+}
+
+.backup-dot-saved {
+  background: var(--ok);
+}
+
+.receipt-backup {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* --- Master backup square (TopBar) --------------------------------------- */
+
+.backup-square {
+  color: #fff;
+}
+
+.backup-square-saved {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.backup-square-unsaved {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.sq-content {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  gap: 2px;
+}
+
+.sq-count {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.sq-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* --- Document chip: wrap so the error line can sit below ----------------- */
+
+.doc-chip {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* --- DocViewer bottom bar (single backup control) ------------------------ */
+
+.doc-viewer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* --- Backup sheet --------------------------------------------------------- */
+
+.save-all-btn {
+  width: 100%;
+}
+
+.backup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.backup-group-title {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.backup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.backup-row-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 0;
+}
+
+.backup-row-icon {
+  color: var(--accent);
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+.backup-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- CSV export button ---------------------------------------------------- */
+
+.export-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.export-btn {
+  flex: 1 1 auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-weight: 650;
 }

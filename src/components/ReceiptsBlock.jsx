@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatCents } from '../lib/money.js';
+import { BackupDot } from './ExportButton.jsx';
 
 function Chevron({ open }) {
   return (
@@ -19,7 +20,7 @@ function tagClass(tag) {
   return tag === 'food' ? 'tag-food' : tag === 'fuel' ? 'tag-fuel' : 'tag-other';
 }
 
-export default function ReceiptsBlock({ receipts, onOpenReceipt }) {
+export default function ReceiptsBlock({ receipts, fileById, onOpenReceipt, onBackupFiles }) {
   const [open, setOpen] = useState(true);
   const sum = receipts.reduce((s, r) => s + (r.amountCents || 0), 0);
 
@@ -66,7 +67,12 @@ export default function ReceiptsBlock({ receipts, onOpenReceipt }) {
                       <span className={'receipt-amount' + (r.amountCents == null ? ' muted' : '')}>
                         {r.amountCents == null ? 'no amount' : formatCents(r.amountCents)}
                       </span>
-                      {r.fileId && <span className="dot dot-amber" title="On phone only" />}
+                      {r.fileId && fileById[r.fileId] && (
+                        <BackupDot
+                          saved={fileById[r.fileId].syncState === 'saved'}
+                          onBackup={() => onBackupFiles([fileById[r.fileId]])}
+                        />
+                      )}
                     </span>
                   </button>
                 </li>
