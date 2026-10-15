@@ -4,6 +4,7 @@ import { formatCents, formatSignedCents, centsToInput, parseAmountToCents } from
 function Tile({ label, totalCents, usedCents, onSaveTotal }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [pendingCents, setPendingCents] = useState(null); // confirm in progress
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -16,15 +17,34 @@ function Tile({ label, totalCents, usedCents, onSaveTotal }) {
   const remaining = totalCents - usedCents;
   const over = remaining < 0;
   const frac = totalCents > 0 ? Math.min(1, Math.max(0, usedCents / totalCents)) : usedCents > 0 ? 1 : 0;
+  const confirming = pendingCents !== null;
 
   function startEdit() {
     setDraft(centsToInput(totalCents));
     setEditing(true);
   }
+
+  // Enter/blur: don't save yet — ask for confirmation first.
   function commit() {
     const cents = parseAmountToCents(draft);
-    onSaveTotal(cents == null ? 0 : cents);
+    const next = cents == null ? 0 : cents;
     setEditing(false);
+    if (next === totalCents) {
+      // No change: just close the editor, no prompt.
+      setPendingCents(null);
+      return;
+    }
+    setPendingCents(next);
+  }
+
+  function confirmSave() {
+    onSaveTotal(pendingCents);
+    setPendingCents(null);
+  }
+
+  function cancel() {
+    // Restore the old value; save nothing.
+    setPendingCents(null);
   }
 
   return (
@@ -61,6 +81,22 @@ function Tile({ label, totalCents, usedCents, onSaveTotal }) {
           style={{ width: Math.round(frac * 100) + '%' }}
         />
       </div>
+
+      {confirming && (
+        <div className="tile-confirm" role="alertdialog" aria-label={`Change ${label} total`}>
+          <span className="tile-confirm-msg">
+            Change {label} total to {formatCents(pendingCents)}?
+          </span>
+          <div className="tile-confirm-actions">
+            <button type="button" className="btn btn-ghost tile-confirm-btn" onClick={cancel}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary tile-confirm-btn" onClick={confirmSave}>
+              Save
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

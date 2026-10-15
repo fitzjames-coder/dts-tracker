@@ -3,6 +3,7 @@ import TodoList from './TodoList.jsx';
 import DocCapture from './DocCapture.jsx';
 import BlockForm from './BlockForm.jsx';
 import ConfirmInline from './ConfirmInline.jsx';
+import DocViewer from './DocViewer.jsx';
 
 const CODE_PREFIXES = ['Confirmation:', 'TANUM:', 'SATO ticket:'];
 
@@ -117,6 +118,7 @@ export default function Block({
   const [capturing, setCapturing] = useState(false);
   const [confirmDeleteBlock, setConfirmDeleteBlock] = useState(false);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState(null);
+  const [viewerFile, setViewerFile] = useState(null);
 
   const openTodos = todos.filter((t) => !t.done).length;
   const allDone = todos.length > 0 && openTodos === 0;
@@ -187,10 +189,17 @@ export default function Block({
             <ul className="doc-chips">
               {files.map((f) => (
                 <li key={f.id} className="doc-chip">
-                  <span className="doc-chip-icon">
-                    <DocKindIcon kind={f.kind} />
-                  </span>
-                  <span className="doc-chip-name">{f.name}</span>
+                  <button
+                    type="button"
+                    className="doc-chip-open"
+                    onClick={() => setViewerFile(f)}
+                    aria-label={`Open ${f.name}`}
+                  >
+                    <span className="doc-chip-icon">
+                      <DocKindIcon kind={f.kind} />
+                    </span>
+                    <span className="doc-chip-name">{f.name}</span>
+                  </button>
                   <span className="doc-chip-state">On phone</span>
                   <button
                     type="button"
@@ -257,6 +266,8 @@ export default function Block({
           )}
         </div>
       )}
+
+      {viewerFile && <DocViewer file={viewerFile} onClose={() => setViewerFile(null)} />}
     </section>
   );
 }

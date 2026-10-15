@@ -10,8 +10,15 @@ createRoot(document.getElementById('root')).render(
 );
 
 // Register the service worker for offline app-shell caching (production only).
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if (import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+    // Warm the PDF chunk and its worker so the service worker caches them,
+    // letting PDFs render offline even if none was ever opened online.
+    import('./components/PdfPages.jsx')
+      .then((m) => m.warm())
+      .catch(() => {});
   });
 }
