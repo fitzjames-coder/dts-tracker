@@ -228,6 +228,11 @@ export async function deleteFile(id) {
   await db.files.delete(id);
 }
 
+/** Read one file row fresh from IndexedDB (used to recover a poisoned blob). */
+export async function getFile(id) {
+  return db.files.get(id);
+}
+
 /**
  * Replace a file's image with a cropped JPEG. Because the bytes changed, the
  * file is marked not-backed-up again (syncState 'local', savedAt null). If the

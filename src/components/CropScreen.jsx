@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cropToJpeg, reencodeToJpeg } from '../lib/image.js';
+import { getFile } from '../db.js';
 
 const MIN = 60; // minimum crop size in screen px
 const HANDLES = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
@@ -46,7 +47,17 @@ function applyDrag(mode, start, dx, dy, fit) {
   return { x: L, y: T, w: R - L, h: B - T };
 }
 
-export default function CropScreen({ source, onDone, onCancel }) {
+/**
+ * @param {{
+ *   source: File|Blob,          fallback image bytes
+ *   fileId?: string,            when opened from the viewer: read fresh from db
+ *   fromViewer?: boolean,       viewer mode: left button is "Cancel", full = no change
+ *   onDone: (blob: Blob) => void,
+ *   onCancel: () => void,
+ * }} props
+ */
+export default function CropScreen({ source, fileId, fromViewer, onDone, onCancel }) {
+  const [src, setSrc] = useState(null); // resolved source blob (possibly a fresh read)
   const [url, setUrl] = useState('');
   const [box, setBox] = useState(null); // { cw, ch } of the body
   const [nat, setNat] = useState(null); // { nw, nh } natural image size
@@ -57,12 +68,34 @@ export default function CropScreen({ source, onDone, onCancel }) {
   const dragRef = useRef(null);
   const fitRef = useRef(null);
 
-  // Object URL for the source; revoked on unmount.
+  // Resolve the source. From the viewer, read the row fresh from IndexedDB so a
+  // blob WebKit left unreadable after a share is not reused.
   useEffect(() => {
-    const u = URL.createObjectURL(source);
+    let cancelled = false;
+    (async () => {
+      let s = source;
+      if (fileId) {
+        try {
+          const f = await getFile(fileId);
+          if (f && f.blob) s = f.blob;
+        } catch {
+          /* fall back to the passed source */
+        }
+      }
+      if (!cancelled) setSrc(s || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source, fileId]);
+
+  // Object URL for the resolved source; revoked on change/unmount.
+  useEffect(() => {
+    if (!src) return undefined;
+    const u = URL.createObjectURL(src);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
-  }, [source]);
+  }, [src]);
 
   // Measure the body; re-measure on resize/rotation.
   useLayoutEffect(() => {
@@ -129,22 +162,32 @@ export default function CropScreen({ source, onDone, onCancel }) {
   }
 
   async function useCrop() {
-    if (busy || !rect || !fit) return;
-    setBusy(true);
+    if (busy || !rect || !fit || !nat || !src) return;
     const natRect = {
       x: (rect.x - fit.offX) / fit.scale,
       y: (rect.y - fit.offY) / fit.scale,
       w: rect.w / fit.scale,
       h: rect.h / fit.scale,
     };
-    const blob = await cropToJpeg(source, natRect);
+    // Full image (within 1 natural px each side) from the viewer = no change.
+    const full =
+      natRect.x <= 1 &&
+      natRect.y <= 1 &&
+      nat.nw - (natRect.x + natRect.w) <= 1 &&
+      nat.nh - (natRect.y + natRect.h) <= 1;
+    if (fromViewer && full) {
+      onCancel();
+      return;
+    }
+    setBusy(true);
+    const blob = await cropToJpeg(src, natRect);
     onDone(blob);
   }
 
   async function skip() {
-    if (busy) return;
+    if (busy || !src) return;
     setBusy(true);
-    const blob = await reencodeToJpeg(source);
+    const blob = await reencodeToJpeg(src);
     onDone(blob);
   }
 
@@ -158,6 +201,7 @@ export default function CropScreen({ source, onDone, onCancel }) {
       </div>
 
       <div className="crop-body" ref={bodyRef}>
+        {!url && <div className="pdf-loading">Loading…</div>}
         {url && fit && (
           <img
             src={url}
@@ -198,9 +242,15 @@ export default function CropScreen({ source, onDone, onCancel }) {
       </div>
 
       <div className="crop-foot">
-        <button type="button" className="btn btn-ghost" onClick={skip} disabled={busy}>
-          Skip
-        </button>
+        {fromViewer ? (
+          <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+        ) : (
+          <button type="button" className="btn btn-ghost" onClick={skip} disabled={busy}>
+            Skip
+          </button>
+        )}
         <button type="button" className="btn btn-ghost" onClick={reset} disabled={busy}>
           Reset
         </button>

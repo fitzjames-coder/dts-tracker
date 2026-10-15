@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { BackupButton } from './ExportButton.jsx';
 import CropScreen from './CropScreen.jsx';
+import { getFile } from '../db.js';
 
 function CropIcon() {
   return (
@@ -38,23 +39,89 @@ class PdfErrorBoundary extends Component {
 export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
   const [url, setUrl] = useState('');
   const [pdfFailed, setPdfFailed] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const cropOpenRef = useRef(false);
   cropOpenRef.current = cropOpen;
+  const urlRef = useRef(null);
+  const retriedRef = useRef(false);
+
+  function setObjectUrl(blob) {
+    if (urlRef.current) {
+      try {
+        URL.revokeObjectURL(urlRef.current);
+      } catch {
+        /* ignore */
+      }
+    }
+    const u = URL.createObjectURL(blob);
+    urlRef.current = u;
+    setUrl(u);
+  }
 
   // Reset transient state whenever a different file is opened.
   useEffect(() => {
     setPdfFailed(false);
     setCropOpen(false);
+    setImgError(false);
+    retriedRef.current = false;
   }, [file]);
 
-  // Object URL from the stored blob; revoked on close/unmount.
+  // Build the object URL from a FRESH read of the row when it has an id —
+  // the blob held in props can be left unreadable by WebKit after a share.
   useEffect(() => {
-    if (!file || !file.blob) return undefined;
-    const u = URL.createObjectURL(file.blob);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
+    if (!file) return undefined;
+    let cancelled = false;
+    setUrl('');
+    (async () => {
+      let blob = file.blob;
+      if (file.id) {
+        try {
+          const fresh = await getFile(file.id);
+          if (fresh && fresh.blob) blob = fresh.blob;
+        } catch {
+          /* fall back to the passed blob */
+        }
+      }
+      if (cancelled || !blob) return;
+      setObjectUrl(blob);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [file]);
+
+  // Revoke the last object URL on unmount.
+  useEffect(
+    () => () => {
+      if (urlRef.current) {
+        try {
+          URL.revokeObjectURL(urlRef.current);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    []
+  );
+
+  // <img> failed to decode: re-read from the db once and retry.
+  async function onImgError() {
+    if (imgError) return;
+    if (file.id && !retriedRef.current) {
+      retriedRef.current = true;
+      try {
+        const fresh = await getFile(file.id);
+        if (fresh && fresh.blob) {
+          setObjectUrl(fresh.blob);
+          return;
+        }
+      } catch {
+        /* fall through to error */
+      }
+    }
+    setImgError(true);
+  }
 
   // Escape closes the viewer — unless the crop overlay is open (it closes first).
   useEffect(() => {
@@ -82,9 +149,17 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
       </div>
 
       <div className={'doc-viewer-body' + (isPdf && !pdfFailed ? ' doc-viewer-body-pdf' : '')}>
-        {url &&
-          (isImage ? (
-            <img src={url} alt={file.name || 'Document'} className="doc-viewer-img" />
+        {imgError ? (
+          <p className="pdf-loading">Couldn’t load this file — pull down to refresh.</p>
+        ) : !url ? (
+          <div className="pdf-loading">Loading…</div>
+        ) : isImage ? (
+            <img
+              src={url}
+              alt={file.name || 'Document'}
+              className="doc-viewer-img"
+              onError={onImgError}
+            />
           ) : isPdf && !pdfFailed ? (
             <PdfErrorBoundary
               onError={() => setPdfFailed(true)}
@@ -110,7 +185,7 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
             </div>
           ) : (
             <iframe title={file.name || 'Document'} src={url} className="doc-viewer-frame" />
-          ))}
+          )}
       </div>
 
       {(onBackup || (onCrop && isImage)) && (
@@ -132,6 +207,8 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
       {cropOpen && onCrop && isImage && (
         <CropScreen
           source={file.blob}
+          fileId={file.id}
+          fromViewer
           onDone={async (blob) => {
             await onCrop(blob);
             setCropOpen(false);
