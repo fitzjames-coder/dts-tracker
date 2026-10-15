@@ -45,6 +45,9 @@ export default function App() {
   const [todoSheetOpen, setTodoSheetOpen] = useState(false);
   const [backupSheetOpen, setBackupSheetOpen] = useState(false);
   const [navTodoBlockId, setNavTodoBlockId] = useState(null);
+  // After any completed Save to Files, iOS needs a reload before the next
+  // view/save. In-memory only, so it resets to false on reload.
+  const [needsUnlock, setNeedsUnlock] = useState(false);
 
   const persistedRef = useRef(false);
   const scrollRestoredRef = useRef(false);
@@ -165,6 +168,7 @@ export default function App() {
       if (res.status === 'done') {
         await markFilesSaved(fileRows.map((f) => f.id));
         await refresh();
+        setNeedsUnlock(true); // iOS: must reload before the next view/save
       }
       return res; // { status, errorName }
     },
@@ -316,6 +320,7 @@ export default function App() {
             setReceiptSheet({ mode: 'new', receipt: null });
           }}
           onRenameTrip={onRenameTrip}
+          needsUnlock={needsUnlock}
         />
         <BudgetTiles
           trip={trip}
@@ -386,6 +391,7 @@ export default function App() {
               voucherUsed={voucherUsed}
               perDiemUsed={perDiemUsed}
               fuelUsed={fuelUsed}
+              onSaved={() => setNeedsUnlock(true)}
             />
           </>
         )}

@@ -1,4 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { unlockSharing } from './ExportButton.jsx';
+
+function UnlockBarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <rect x="4" y="11" width="12" height="9" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 11V7a4 4 0 017.9-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function SearchIcon() {
   return (
@@ -53,6 +63,7 @@ export default function TopBar({
   onOpenBackup,
   onNewReceipt,
   onRenameTrip,
+  needsUnlock,
 }) {
   const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState(trip?.name || '');
@@ -168,6 +179,13 @@ export default function TopBar({
           <ReceiptIcon />
         </button>
       </div>
+
+      {needsUnlock && (
+        <button type="button" className="unlock-bar" onClick={unlockSharing}>
+          <UnlockBarIcon />
+          <span>Tap to refresh before your next save</span>
+        </button>
+      )}
     </div>
   );
 }
