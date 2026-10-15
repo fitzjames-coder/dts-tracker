@@ -184,6 +184,31 @@ textarea {
   color: var(--danger);
 }
 
+/* Compact pill shown when both dates are set (tap to edit). */
+.trip-range-pill {
+  flex: 0 0 auto;
+  border: none;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.trip-dates-done {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 650;
+  border-radius: 6px;
+  padding: 4px 10px;
+  min-height: 32px;
+}
+
 .trip-label {
   font-size: 11px;
   font-weight: 700;
@@ -1877,21 +1902,37 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.doc-meta-field:first-child {
-  flex: 0 0 auto;
-}
-
-.doc-meta-field:last-child {
-  flex: 1 1 auto;
   min-width: 0;
+}
+
+.doc-meta-date {
+  flex: 0 0 150px;
+}
+
+.doc-meta-loc {
+  flex: 1 1 auto;
+}
+
+.doc-meta .text-input {
+  width: 100%;
+  font-size: 16px; /* >= 16px so iOS does not zoom */
 }
 
 .doc-meta-label {
   font-size: 11px;
   font-weight: 650;
   color: var(--muted);
+}
+
+/* Stack the two fields on very narrow screens so neither overlaps. */
+@media (max-width: 360px) {
+  .doc-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .doc-meta-date {
+    flex: 0 0 auto;
+  }
 }
 
 /* Receipt row location */

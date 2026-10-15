@@ -1,6 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { unlockSharing } from './ExportButton.jsx';
 
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function parseIso(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? { y: +m[1], mo: +m[2], d: +m[3] } : null;
+}
+
+/** "15–20 Oct", "28 Oct – 3 Nov", or with years when they differ. */
+function formatRange(start, end) {
+  const a = parseIso(start);
+  const b = parseIso(end);
+  if (!a || !b) return '';
+  const sameYear = a.y === b.y;
+  if (sameYear && a.mo === b.mo) {
+    return `${a.d}–${b.d} ${MON[b.mo - 1]}`;
+  }
+  const left = sameYear ? `${a.d} ${MON[a.mo - 1]}` : `${a.d} ${MON[a.mo - 1]} ${a.y}`;
+  const right = sameYear ? `${b.d} ${MON[b.mo - 1]}` : `${b.d} ${MON[b.mo - 1]} ${b.y}`;
+  return `${left} – ${right}`;
+}
+
 function UnlockBarIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -69,6 +90,7 @@ export default function TopBar({
   const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState(trip?.name || '');
   const [dateNote, setDateNote] = useState(false);
+  const [editingDates, setEditingDates] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -114,37 +136,60 @@ export default function TopBar({
           </button>
         )}
 
-        <span className="trip-dates">
-          <label className="trip-date">
-            <span className="trip-date-label">From</span>
-            <input
-              type="date"
-              value={trip?.startDate || ''}
-              onChange={(e) =>
-                onSaveTripDates({ startDate: e.target.value || null })
-              }
-              aria-label="Trip start date"
-            />
-          </label>
-          <span className="trip-date-dash">–</span>
-          <label className="trip-date">
-            <span className="trip-date-label">To</span>
-            <input
-              type="date"
-              value={trip?.endDate || ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v && trip?.startDate && v < trip.startDate) {
-                  setDateNote(true);
-                  return; // To may not be before From — don't save
+        {trip?.startDate && trip?.endDate && !editingDates ? (
+          <button
+            type="button"
+            className="trip-range-pill"
+            onClick={() => setEditingDates(true)}
+            aria-label="Edit trip dates"
+          >
+            {formatRange(trip.startDate, trip.endDate)}
+          </button>
+        ) : (
+          <span className="trip-dates">
+            <label className="trip-date">
+              <span className="trip-date-label">From</span>
+              <input
+                type="date"
+                value={trip?.startDate || ''}
+                onChange={(e) =>
+                  onSaveTripDates({ startDate: e.target.value || null })
                 }
-                setDateNote(false);
-                onSaveTripDates({ endDate: v || null });
-              }}
-              aria-label="Trip end date"
-            />
-          </label>
-        </span>
+                aria-label="Trip start date"
+              />
+            </label>
+            <span className="trip-date-dash">–</span>
+            <label className="trip-date">
+              <span className="trip-date-label">To</span>
+              <input
+                type="date"
+                value={trip?.endDate || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v && trip?.startDate && v < trip.startDate) {
+                    setDateNote(true);
+                    return; // To may not be before From — don't save
+                  }
+                  setDateNote(false);
+                  onSaveTripDates({ endDate: v || null });
+                }}
+                aria-label="Trip end date"
+              />
+            </label>
+            {trip?.startDate && trip?.endDate && (
+              <button
+                type="button"
+                className="trip-dates-done"
+                onClick={() => {
+                  setEditingDates(false);
+                  setDateNote(false);
+                }}
+              >
+                Done
+              </button>
+            )}
+          </span>
+        )}
         {dateNote && <span className="trip-date-note">To can’t be before From</span>}
       </div>
 

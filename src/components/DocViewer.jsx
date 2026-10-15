@@ -159,7 +159,7 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop, onUp
 
       {editableMeta && (
         <div className="doc-meta">
-          <label className="doc-meta-field">
+          <label className="doc-meta-field doc-meta-date">
             <span className="doc-meta-label">Date</span>
             <input
               type="date"
@@ -172,7 +172,7 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop, onUp
               aria-label="Document date"
             />
           </label>
-          <label className="doc-meta-field">
+          <label className="doc-meta-field doc-meta-loc">
             <span className="doc-meta-label">Location</span>
             <input
               type="text"
