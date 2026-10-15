@@ -29,11 +29,6 @@ import TodoSheet from './components/TodoSheet.jsx';
 import BackupSheet from './components/BackupSheet.jsx';
 import ExportButton from './components/ExportButton.jsx';
 
-function withJpgExt(name) {
-  const base = (name || 'photo').replace(/\.[^.]+$/, '').trim() || 'photo';
-  return base + '.jpg';
-}
-
 export default function App() {
   const [trip, setTrip] = useState(null);
   const [blocks, setBlocks] = useState([]);
@@ -212,19 +207,23 @@ export default function App() {
     act(async () => {
       let fileRow;
       if (source === 'photo') {
+        // Camera capture -> numbered <BlockWord>-<n>.jpg (db assigns the name).
         const blob = await reencodeToJpeg(file);
         fileRow = {
           kind: 'photo',
-          name: withJpgExt(file.name),
+          numbered: true,
+          ext: 'jpg',
           mimeType: 'image/jpeg',
           size: blob.size,
           blob,
         };
       } else {
+        // Uploaded file -> keep its original name (db dedupes if needed).
         const isPdf = file.type === 'application/pdf';
         fileRow = {
           kind: isPdf ? 'pdf' : 'upload',
-          name: file.name || (isPdf ? 'document.pdf' : 'upload'),
+          numbered: false,
+          originalName: file.name || (isPdf ? 'document.pdf' : 'upload'),
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
           blob: file,

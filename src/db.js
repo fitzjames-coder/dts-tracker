@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { blockWord, uniqueName } from './lib/filenames.js';
 
 // ---------------------------------------------------------------------------
 // Dexie database "dts-tracker", version 1.
@@ -60,6 +61,7 @@ export async function addBlock(tripId, { title, lines }) {
     order: minOrder - 1,
     open: true,
     todoOpen: true,
+    nextFileNo: 1,
     createdAt: now(),
     updatedAt: now(),
   };
@@ -121,6 +123,11 @@ export async function addReceipt(tripId, fields, fileRow) {
   await db.transaction('rw', db.receipts, db.files, async () => {
     let fileId = null;
     if (fileRow) {
+      // Receipt photos keep the date_tag_amount_title.jpg pattern; if that name
+      // is taken, append _2, _3, … before .jpg so Files never asks to replace.
+      const existing = await db.files.toArray();
+      const names = new Set(existing.map((f) => f.name));
+      const name = uniqueName(fileRow.name, names, '_');
       fileId = uid();
       await db.files.add({
         id: fileId,
@@ -128,7 +135,7 @@ export async function addReceipt(tripId, fields, fileRow) {
         blockId: null,
         receiptId,
         kind: fileRow.kind,
-        name: fileRow.name,
+        name,
         mimeType: fileRow.mimeType,
         size: fileRow.size,
         blob: fileRow.blob,
@@ -168,25 +175,51 @@ export async function deleteReceipt(id) {
 
 // --- Files (documents) ----------------------------------------------------
 
-/** Attach a document to a block. Returns the stored file row. */
+/**
+ * Attach a document to a block. Assigns a unique name:
+ *  - numbered (photos/scans): <BlockWord>-<n>.<ext> using the block's
+ *    nextFileNo counter, which only ever counts up (numbers never reused);
+ *  - uploads: keep the original name, appending -2, -3, … if already taken.
+ * Returns the stored file row.
+ */
 export async function addFile(tripId, blockId, fileRow) {
-  const file = {
-    id: uid(),
-    tripId,
-    blockId: blockId ?? null,
-    receiptId: null,
-    kind: fileRow.kind,
-    name: fileRow.name,
-    mimeType: fileRow.mimeType,
-    size: fileRow.size,
-    blob: fileRow.blob,
-    createdAt: now(),
-    syncState: 'local',
-    savedAt: null,
-    driveFileId: null,
-  };
-  await db.files.add(file);
-  return file;
+  return db.transaction('rw', db.files, db.blocks, async () => {
+    const existing = await db.files.toArray();
+    const names = new Set(existing.map((f) => f.name));
+
+    let name;
+    if (fileRow.numbered) {
+      const block = blockId ? await db.blocks.get(blockId) : null;
+      const word = blockWord(block?.title);
+      const ext = fileRow.ext || (fileRow.kind === 'pdf' ? 'pdf' : 'jpg');
+      let n = block && Number.isFinite(block.nextFileNo) ? block.nextFileNo : 1;
+      // Skip any number already taken (e.g. a same-named word on another block)
+      // so the clean <Word>-<n> format never collides with an existing file.
+      while (names.has(`${word}-${n}.${ext}`)) n += 1;
+      name = `${word}-${n}.${ext}`;
+      if (block) await db.blocks.update(block.id, { nextFileNo: n + 1 });
+    } else {
+      name = uniqueName(fileRow.originalName || 'upload', names, '-');
+    }
+
+    const file = {
+      id: uid(),
+      tripId,
+      blockId: blockId ?? null,
+      receiptId: null,
+      kind: fileRow.kind,
+      name,
+      mimeType: fileRow.mimeType,
+      size: fileRow.size,
+      blob: fileRow.blob,
+      createdAt: now(),
+      syncState: 'local',
+      savedAt: null,
+      driveFileId: null,
+    };
+    await db.files.add(file);
+    return file;
+  });
 }
 
 /** Delete a single document (file row and its blob). */

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { shareFiles } from '../lib/share.js';
+import { shareFiles, getShareLog } from '../lib/share.js';
 import { buildReceiptsCsv, csvFilename } from '../lib/csv.js';
 
 // This file is the shared, dependency-cycle-free home for the backup controls
@@ -24,15 +24,27 @@ function SmallTick() {
   );
 }
 
-// Share arrow combined with a down arrow: "share this out / save to Files".
+// One glyph combining the iOS share symbol (open-top box + up arrow, left)
+// and a download arrow (down arrow + baseline, right).
 function SaveShareIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path d="M12 3v11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 14v3a2 2 0 002 2h10a2 2 0 002-2v-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 30 22" width="24" height="18" aria-hidden="true">
+      {/* iOS share: open-top box + up arrow */}
+      <path d="M4 11v5a2 2 0 002 2h4a2 2 0 002-2v-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 13V3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M5 6l3-3 3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* download: down arrow + baseline */}
+      <path d="M22 3v9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M19 9l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 18h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
+}
+
+// DEBUG-SHARE: format one share-log record for the on-screen diagnostics line.
+function diagLine(taps, rec) {
+  if (!rec) return `taps=${taps}`;
+  return `taps=${taps} #${rec.seq} invoked=${rec.invoked ? 'yes' : 'no'} status=${rec.status} err=${rec.errorName || '-'} ${rec.ms}ms`;
 }
 
 /**
@@ -47,11 +59,16 @@ function SaveShareIcon() {
  */
 export function BackupButton({ saved, onBackup, full }) {
   const [note, setNote] = useState(null); // null | 'unsupported' | {failed: errorName}
+  const [taps, setTaps] = useState(0); // DEBUG-SHARE
+  const [diag, setDiag] = useState(null); // DEBUG-SHARE
 
   async function handle(e) {
+    setTaps((t) => t + 1); // DEBUG-SHARE: count raw taps before anything else
     e.stopPropagation();
     setNote(null); // clears on every tap
     const res = (await onBackup()) || {};
+    const log = getShareLog(); // DEBUG-SHARE
+    setDiag(log[log.length - 1] || null); // DEBUG-SHARE
     if (res.status === 'unsupported') setNote('unsupported');
     else if (res.status === 'failed') setNote({ failed: res.errorName || 'error' });
     // 'done' / 'cancelled' leave no note.
@@ -62,14 +79,19 @@ export function BackupButton({ saved, onBackup, full }) {
       <button
         type="button"
         className={
-          'backup-btn ' +
+          'backup-btn backup-btn-icon ' +
           (saved ? 'backup-btn-saved' : 'backup-btn-unsaved') +
           (full ? ' backup-btn-full' : '')
         }
         onClick={handle}
-        aria-label={saved ? 'Backed up — tap to save again' : 'Save to Files'}
+        aria-label={saved ? 'Saved — tap to share again' : 'Save to Files'}
       >
-        {saved ? <SmallTick /> : <SaveShareIcon />} {saved ? 'Saved' : 'Save'}
+        <SaveShareIcon />
+        {saved && (
+          <span className="backup-tick" aria-hidden="true">
+            <SmallTick />
+          </span>
+        )}
       </button>
       {note === 'unsupported' && <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>}
       {note && note.failed && (
@@ -77,6 +99,8 @@ export function BackupButton({ saved, onBackup, full }) {
           Couldn’t open the share sheet ({note.failed}) — tap again.
         </span>
       )}
+      {/* DEBUG-SHARE */}
+      <span className="share-diag">{diagLine(taps, diag)}</span>
     </>
   );
 }
@@ -112,8 +136,11 @@ export default function ExportButton({
 }) {
   const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'failed'
   const [errName, setErrName] = useState('');
+  const [taps, setTaps] = useState(0); // DEBUG-SHARE
+  const [diag, setDiag] = useState(null); // DEBUG-SHARE
 
   async function onExport() {
+    setTaps((t) => t + 1); // DEBUG-SHARE: count raw taps before anything else
     setStatus(''); // clears any prior message on each tap (sync; keeps activation)
     const csv = buildReceiptsCsv({
       trip,
@@ -131,6 +158,8 @@ export default function ExportButton({
       return;
     }
     const res = (await shareFiles([file])) || {};
+    const log = getShareLog(); // DEBUG-SHARE
+    setDiag(log[log.length - 1] || null); // DEBUG-SHARE
     if (res.status === 'done') {
       setStatus('exported');
       setTimeout(() => setStatus((s) => (s === 'exported' ? '' : s)), 2000);
@@ -155,6 +184,8 @@ export default function ExportButton({
           Couldn’t open the share sheet ({errName}) — tap again.
         </span>
       )}
+      {/* DEBUG-SHARE */}
+      <span className="share-diag">{diagLine(taps, diag)}</span>
     </div>
   );
 }

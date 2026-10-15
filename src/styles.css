@@ -1439,15 +1439,20 @@ textarea {
 .backup-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
   color: #fff;
-  min-height: 32px;
   flex: 0 0 auto;
+}
+
+/* Icon-only square control (no text), with room for the corner tick badge. */
+.backup-btn-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  overflow: visible;
 }
 
 .backup-btn-unsaved {
@@ -1459,10 +1464,41 @@ textarea {
 }
 
 .backup-btn-full {
-  width: 100%;
+  width: 44px;
+  height: 44px;
+}
+
+/* White tick badge in the top-right corner when saved. */
+.backup-tick {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ok);
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  min-height: 44px;
-  font-size: 14px;
+  box-shadow: 0 0 0 1.5px var(--ok);
+}
+
+.backup-tick svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* DEBUG-SHARE: temporary on-screen share diagnostics line. */
+.share-diag {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
 }
 
 .backup-unsupported {

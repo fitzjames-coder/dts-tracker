@@ -29,3 +29,39 @@ export function receiptFilename({ date, tag, amountCents, title } = {}) {
 
   return parts.join('_') + '.jpg';
 }
+
+/**
+ * The first word of a block title, letters and digits only, original case
+ * kept ("Flights out" -> "Flights"). Falls back to "Block".
+ */
+export function blockWord(title) {
+  const first = String(title || '').trim().split(/\s+/)[0] || '';
+  const cleaned = first.replace(/[^A-Za-z0-9]/g, '');
+  return cleaned || 'Block';
+}
+
+/** Split a filename into [base, ext] where ext includes the leading dot. */
+function splitExt(name) {
+  const i = name.lastIndexOf('.');
+  if (i <= 0) return [name, ''];
+  return [name.slice(0, i), name.slice(i)];
+}
+
+/**
+ * Return `name` if it is not already in `existing`; otherwise append
+ * `<sep>2`, `<sep>3`, … before the extension until it is unique.
+ * @param {string} name
+ * @param {Set<string>} existing
+ * @param {string} sep separator before the number ("-" uploads, "_" receipts)
+ */
+export function uniqueName(name, existing, sep = '-') {
+  if (!existing || !existing.has(name)) return name;
+  const [base, ext] = splitExt(name);
+  let i = 2;
+  let candidate = `${base}${sep}${i}${ext}`;
+  while (existing.has(candidate)) {
+    i += 1;
+    candidate = `${base}${sep}${i}${ext}`;
+  }
+  return candidate;
+}
