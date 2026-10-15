@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ensureTrip,
+  getTrip,
   loadAll,
   updateTrip,
   addBlock,
@@ -18,11 +19,14 @@ import {
   markFilesSaved,
   replaceFileBlob,
   wipeAll,
+  importTrip,
+  attachFiles,
 } from './db.js';
 import { reencodeToJpeg } from './lib/image.js';
 import { formatCents, centsToInput } from './lib/money.js';
 import { shareFiles } from './lib/share.js';
 import { buildReceiptsCsv, csvFilename } from './lib/csv.js';
+import { parseTripCsv } from './lib/csvImport.js';
 import TopBar from './components/TopBar.jsx';
 import BudgetTiles from './components/BudgetTiles.jsx';
 import ReceiptsBlock from './components/ReceiptsBlock.jsx';
@@ -32,6 +36,7 @@ import ReceiptSheet from './components/ReceiptSheet.jsx';
 import TodoSheet from './components/TodoSheet.jsx';
 import BackupSheet from './components/BackupSheet.jsx';
 import NewTripSheet from './components/NewTripSheet.jsx';
+import ImportSheet from './components/ImportSheet.jsx';
 import ExportButton, { UNLOCK_SCROLL_KEY } from './components/ExportButton.jsx';
 
 export default function App() {
@@ -49,6 +54,10 @@ export default function App() {
   const [todoSheetOpen, setTodoSheetOpen] = useState(false);
   const [backupSheetOpen, setBackupSheetOpen] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
+  // Import: { phase:'error', message } | { phase:'confirm', parsed } | { phase:'done' }
+  const [importSheet, setImportSheet] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
+  const [reattachResult, setReattachResult] = useState(null);
   const [navTodoBlockId, setNavTodoBlockId] = useState(null);
   // After any completed Save to Files, iOS needs a reload before the next
   // view/save. In-memory only, so it resets to false on reload.
@@ -56,6 +65,8 @@ export default function App() {
 
   const persistedRef = useRef(false);
   const scrollRestoredRef = useRef(false);
+  const csvInputRef = useRef(null);
+  const reattachInputRef = useRef(null);
 
   const reload = useCallback(async (tripId) => {
     const data = await loadAll(tripId);
@@ -206,6 +217,75 @@ export default function App() {
     await wipeAll();
     location.reload();
   }, []);
+
+  // --- Import from CSV ------------------------------------------------------
+
+  const pendingCount = (trip && trip.pendingFiles ? trip.pendingFiles.length : 0);
+
+  // Is there anything in the current trip worth warning about before replacing?
+  const tripHasData =
+    blocks.length > 0 ||
+    receipts.length > 0 ||
+    files.length > 0 ||
+    !!(trip &&
+      ((trip.name && trip.name !== 'New trip' && trip.name !== 'Imported trip') ||
+        trip.voucherCents ||
+        trip.perDiemCents ||
+        trip.fuelCents ||
+        trip.startDate ||
+        trip.endDate));
+
+  // Rebuild the whole trip from a parsed CSV, then refresh and show the summary.
+  const doImport = useCallback(
+    async (parsed) => {
+      await ensurePersist();
+      await importTrip(parsed);
+      const t = await getTrip();
+      setTrip(t);
+      await reload(t.id);
+      setReattachResult(null);
+      setImportSummary({
+        receipts: parsed.receipts.length,
+        blocks: parsed.blocks.length,
+        files: t && t.pendingFiles ? t.pendingFiles.length : 0,
+      });
+      setImportSheet({ phase: 'done' });
+    },
+    [ensurePersist, reload]
+  );
+
+  // CSV picked: parse it, then either confirm a replace or import straight away.
+  const onPickCsv = useCallback(
+    async (file) => {
+      if (!file) return;
+      let parsed;
+      try {
+        const text = await file.text();
+        parsed = parseTripCsv(text);
+      } catch (err) {
+        setImportSheet({ phase: 'error', message: err.message || 'Couldn’t read this file.' });
+        return;
+      }
+      if (tripHasData) {
+        setImportSheet({ phase: 'confirm', parsed });
+      } else {
+        await doImport(parsed);
+      }
+    },
+    [tripHasData, doImport]
+  );
+
+  // Reattach picked files to the imported trip by exact name match.
+  const onReattach = useCallback(
+    async (fileList) => {
+      const res = await attachFiles(fileList);
+      const t = await getTrip();
+      setTrip(t);
+      await reload(t.id);
+      setReattachResult(res);
+    },
+    [reload]
+  );
 
   // --- Search ---------------------------------------------------------------
 
@@ -372,6 +452,16 @@ export default function App() {
           <p className="nothing-matches">Nothing matches “{search.trim()}”.</p>
         ) : (
           <>
+            {pendingCount > 0 && (
+              <button
+                type="button"
+                className="reattach-line"
+                onClick={() => reattachInputRef.current && reattachInputRef.current.click()}
+              >
+                {pendingCount} {pendingCount === 1 ? 'file' : 'files'} can be reattached
+              </button>
+            )}
+
             <ReceiptsBlock
               receipts={visibleReceipts}
               fileById={fileById}
@@ -430,9 +520,43 @@ export default function App() {
             >
               Start new trip
             </button>
+
+            <button
+              type="button"
+              className="import-trip-btn"
+              onClick={() => {
+                ensurePersist();
+                if (csvInputRef.current) csvInputRef.current.click();
+              }}
+            >
+              Import trip from CSV
+            </button>
           </>
         )}
       </main>
+
+      <input
+        ref={csvInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files && e.target.files[0];
+          e.target.value = '';
+          onPickCsv(f);
+        }}
+      />
+      <input
+        ref={reattachInputRef}
+        type="file"
+        multiple
+        accept="image/*,application/pdf"
+        hidden
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length) onReattach(e.target.files);
+          e.target.value = '';
+        }}
+      />
 
       {receiptSheet && (
         <ReceiptSheet
@@ -463,6 +587,22 @@ export default function App() {
           makeCsvFile={makeCsvFile}
           onWipe={onWipeAndReload}
           onClose={() => setNewTripOpen(false)}
+        />
+      )}
+
+      {importSheet && (
+        <ImportSheet
+          phase={importSheet.phase}
+          message={importSheet.message}
+          summary={importSummary}
+          pendingCount={pendingCount}
+          reattachResult={reattachResult}
+          onReplace={() => doImport(importSheet.parsed)}
+          onReattach={onReattach}
+          onClose={() => {
+            setImportSheet(null);
+            setReattachResult(null);
+          }}
         />
       )}
 
