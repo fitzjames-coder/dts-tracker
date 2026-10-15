@@ -33,14 +33,24 @@ function ReceiptIcon() {
   );
 }
 
+function BackupTick() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function TopBar({
   trip,
-  localFileCount,
+  allSaved,
+  unsavedCount,
   persistWarn,
   search,
   onSearch,
   openTodoCount,
   onOpenTodos,
+  onOpenBackup,
   onNewReceipt,
   onRenameTrip,
 }) {
@@ -90,13 +100,6 @@ export default function TopBar({
             {trip?.name || 'New trip'}
           </button>
         )}
-
-        {localFileCount > 0 && (
-          <span className="status-light" title="Files stored only on this phone">
-            <span className="dot dot-amber" />
-            {localFileCount} on phone only
-          </span>
-        )}
       </div>
 
       {persistWarn && (
@@ -131,6 +134,28 @@ export default function TopBar({
             </span>
           ) : (
             <CheckIcon />
+          )}
+        </button>
+
+        <button
+          type="button"
+          className={
+            'icon-btn backup-square ' +
+            (allSaved ? 'backup-square-saved' : 'backup-square-unsaved')
+          }
+          onClick={onOpenBackup}
+          aria-label={allSaved ? 'All files backed up' : `${unsavedCount} files not backed up`}
+        >
+          {allSaved ? (
+            <span className="sq-content">
+              <BackupTick />
+              <span className="sq-label">SAVED</span>
+            </span>
+          ) : (
+            <span className="sq-content">
+              <span className="sq-count">{unsavedCount}</span>
+              <span className="sq-label">BACKUP</span>
+            </span>
           )}
         </button>
 

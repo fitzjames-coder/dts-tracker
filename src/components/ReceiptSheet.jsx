@@ -4,6 +4,7 @@ import { receiptFilename } from '../lib/filenames.js';
 import { parseAmountToCents, centsToInput } from '../lib/money.js';
 import ConfirmInline from './ConfirmInline.jsx';
 import DocViewer from './DocViewer.jsx';
+import { BackupButton } from './ExportButton.jsx';
 
 function todayStr() {
   const d = new Date();
@@ -45,7 +46,7 @@ const HINTS = {
   fuel: 'fuel + voucher',
 };
 
-export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onSaveNew, onSaveEdit, onDelete }) {
+export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onSaveNew, onSaveEdit, onDelete, onBackupFiles }) {
   const isEdit = mode === 'edit';
   const [title, setTitle] = useState(receipt?.title || '');
   const [tag, setTag] = useState(receipt?.tag || 'other');
@@ -189,6 +190,16 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
                 {busy ? 'Processing…' : 'Take photo'}
               </button>
             )}
+
+            {isEdit && existingFile && onBackupFiles && (
+              <div className="receipt-backup">
+                <BackupButton
+                  full
+                  saved={existingFile.syncState === 'saved'}
+                  onBackup={() => onBackupFiles([existingFile])}
+                />
+              </div>
+            )}
           </div>
 
           <label className="field">
@@ -275,7 +286,14 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
         />
 
         {viewerOpen && viewerFile && (
-          <DocViewer file={viewerFile} onClose={() => setViewerOpen(false)} />
+          <DocViewer
+            file={viewerFile}
+            saved={viewerFile.id ? viewerFile.syncState === 'saved' : undefined}
+            onBackup={
+              viewerFile.id && onBackupFiles ? () => onBackupFiles([viewerFile]) : undefined
+            }
+            onClose={() => setViewerOpen(false)}
+          />
         )}
       </div>
     </div>

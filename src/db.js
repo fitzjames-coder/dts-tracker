@@ -134,6 +134,7 @@ export async function addReceipt(tripId, fields, fileRow) {
         blob: fileRow.blob,
         createdAt: now(),
         syncState: 'local',
+        savedAt: null,
         driveFileId: null,
       });
     }
@@ -181,6 +182,7 @@ export async function addFile(tripId, blockId, fileRow) {
     blob: fileRow.blob,
     createdAt: now(),
     syncState: 'local',
+    savedAt: null,
     driveFileId: null,
   };
   await db.files.add(file);
@@ -190,6 +192,20 @@ export async function addFile(tripId, blockId, fileRow) {
 /** Delete a single document (file row and its blob). */
 export async function deleteFile(id) {
   await db.files.delete(id);
+}
+
+/**
+ * Mark files as backed up ("saved") in one transaction, stamping savedAt.
+ * @param {string[]} ids
+ */
+export async function markFilesSaved(ids) {
+  if (!ids || !ids.length) return;
+  const savedAt = now();
+  await db.transaction('rw', db.files, async () => {
+    for (const id of ids) {
+      await db.files.update(id, { syncState: 'saved', savedAt });
+    }
+  });
 }
 
 // --- Bulk loaders ---------------------------------------------------------

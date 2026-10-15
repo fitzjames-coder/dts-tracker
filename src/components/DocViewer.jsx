@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { BackupButton } from './ExportButton.jsx';
 
 // Full-screen viewer for a stored document/photo. Everything comes from the
 // blob held in IndexedDB, so it works fully offline — no network.
@@ -24,7 +25,7 @@ class PdfErrorBoundary extends Component {
   }
 }
 
-export default function DocViewer({ file, onClose }) {
+export default function DocViewer({ file, onClose, onBackup, saved }) {
   const [url, setUrl] = useState('');
   const [pdfFailed, setPdfFailed] = useState(false);
 
@@ -122,11 +123,14 @@ export default function DocViewer({ file, onClose }) {
           ))}
       </div>
 
-      {canShare && (
+      {(canShare || onBackup) && (
         <div className="doc-viewer-bottom">
-          <button type="button" className="btn btn-primary doc-viewer-share" onClick={onShare}>
-            Share / Save to Files
-          </button>
+          {canShare && (
+            <button type="button" className="btn btn-primary doc-viewer-share" onClick={onShare}>
+              Share / Save to Files
+            </button>
+          )}
+          {onBackup && <BackupButton saved={saved} onBackup={onBackup} />}
         </div>
       )}
     </div>
