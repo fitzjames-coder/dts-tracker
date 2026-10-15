@@ -63,10 +63,12 @@ export default function TopBar({
   onOpenBackup,
   onNewReceipt,
   onRenameTrip,
+  onSaveTripDates,
   needsUnlock,
 }) {
   const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState(trip?.name || '');
+  const [dateNote, setDateNote] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -111,6 +113,39 @@ export default function TopBar({
             {trip?.name || 'New trip'}
           </button>
         )}
+
+        <span className="trip-dates">
+          <label className="trip-date">
+            <span className="trip-date-label">From</span>
+            <input
+              type="date"
+              value={trip?.startDate || ''}
+              onChange={(e) =>
+                onSaveTripDates({ startDate: e.target.value || null })
+              }
+              aria-label="Trip start date"
+            />
+          </label>
+          <span className="trip-date-dash">–</span>
+          <label className="trip-date">
+            <span className="trip-date-label">To</span>
+            <input
+              type="date"
+              value={trip?.endDate || ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v && trip?.startDate && v < trip.startDate) {
+                  setDateNote(true);
+                  return; // To may not be before From — don't save
+                }
+                setDateNote(false);
+                onSaveTripDates({ endDate: v || null });
+              }}
+              aria-label="Trip end date"
+            />
+          </label>
+        </span>
+        {dateNote && <span className="trip-date-note">To can’t be before From</span>}
       </div>
 
       {persistWarn && (

@@ -61,6 +61,7 @@ export default function ReceiptsBlock({ receipts, fileById, onOpenReceipt, onBac
                       <span className="receipt-sub">
                         <span className={'tag-chip ' + tagClass(r.tag)}>{r.tag}</span>
                         <span className="receipt-date">{r.date}</span>
+                        {r.location && <span className="receipt-loc">· {r.location}</span>}
                       </span>
                     </span>
                     <span className="receipt-right">

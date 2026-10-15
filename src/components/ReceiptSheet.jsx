@@ -51,6 +51,8 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const [title, setTitle] = useState(receipt?.title || '');
   const [tag, setTag] = useState(receipt?.tag || 'other');
   const [amount, setAmount] = useState(isEdit ? centsToInput(receipt?.amountCents) : '');
+  const [date, setDate] = useState(receipt?.date || todayStr());
+  const [location, setLocation] = useState(receipt?.location || '');
   const [imageBlob, setImageBlob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
@@ -60,7 +62,6 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const photoRef = useRef(null);
   const overlayOpenRef = useRef(false);
   overlayOpenRef.current = viewerOpen || cropSource != null;
-  const date = receipt?.date || todayStr();
 
   // New mode: open the camera immediately.
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const filename = receiptFilename({ date, tag, amountCents, title });
 
   function save() {
-    const fields = { title: title.trim(), tag, amountCents, date };
+    const fields = { title: title.trim(), tag, amountCents, date, location: location.trim() };
     if (isEdit) {
       onSaveEdit(receipt.id, fields);
     } else {
@@ -211,6 +212,27 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Dinner"
+            />
+          </label>
+
+          <label className="field">
+            <span className="field-label">Location (optional)</span>
+            <input
+              className="text-input"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Location"
+            />
+          </label>
+
+          <label className="field">
+            <span className="field-label">Date</span>
+            <input
+              type="date"
+              className="text-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value || todayStr())}
+              aria-label="Receipt date"
             />
           </label>
 

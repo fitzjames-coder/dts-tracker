@@ -1,7 +1,7 @@
 import { Component, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { BackupButton } from './ExportButton.jsx';
 import CropScreen from './CropScreen.jsx';
-import { getFile } from '../db.js';
+import { getFile, fileDate } from '../db.js';
 
 function CropIcon() {
   return (
@@ -36,7 +36,7 @@ class PdfErrorBoundary extends Component {
   }
 }
 
-export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
+export default function DocViewer({ file, onClose, onBackup, saved, onCrop, onUpdateFile }) {
   const [url, setUrl] = useState('');
   const [pdfFailed, setPdfFailed] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -45,6 +45,15 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
   cropOpenRef.current = cropOpen;
   const urlRef = useRef(null);
   const retriedRef = useRef(false);
+
+  // Editable date + location for block documents (seeded from the file).
+  const editableMeta = !!(onUpdateFile && file && file.blockId);
+  const [date, setDate] = useState('');
+  const [location, setLocation] = useState('');
+  useEffect(() => {
+    setDate(fileDate(file));
+    setLocation((file && file.location) || '');
+  }, [file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setObjectUrl(blob) {
     if (urlRef.current) {
@@ -147,6 +156,36 @@ export default function DocViewer({ file, onClose, onBackup, saved, onCrop }) {
           Close
         </button>
       </div>
+
+      {editableMeta && (
+        <div className="doc-meta">
+          <label className="doc-meta-field">
+            <span className="doc-meta-label">Date</span>
+            <input
+              type="date"
+              className="text-input"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                onUpdateFile(file.id, { date: e.target.value });
+              }}
+              aria-label="Document date"
+            />
+          </label>
+          <label className="doc-meta-field">
+            <span className="doc-meta-label">Location</span>
+            <input
+              type="text"
+              className="text-input"
+              value={location}
+              placeholder="Location"
+              onChange={(e) => setLocation(e.target.value)}
+              onBlur={() => onUpdateFile(file.id, { location })}
+              aria-label="Document location"
+            />
+          </label>
+        </div>
+      )}
 
       <div className={'doc-viewer-body' + (isPdf && !pdfFailed ? ' doc-viewer-body-pdf' : '')}>
         {imgError ? (

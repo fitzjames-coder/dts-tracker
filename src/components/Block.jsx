@@ -6,8 +6,20 @@ import ConfirmInline from './ConfirmInline.jsx';
 import DocViewer from './DocViewer.jsx';
 import CropScreen from './CropScreen.jsx';
 import { BackupButton } from './ExportButton.jsx';
+import { fileDate } from '../db.js';
 
 const CODE_PREFIXES = ['Confirmation:', 'TANUM:', 'SATO ticket:'];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "2026-10-15" -> "15 Oct" (parsed locally, no timezone shift). */
+function shortDate(iso) {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const mon = MONTHS[Number(m[2]) - 1] || '';
+  return `${Number(m[3])} ${mon}`.trim();
+}
 
 function Chevron({ open }) {
   return (
@@ -118,6 +130,7 @@ export default function Block({
   onBackupFiles,
   onToggleDocsOpen,
   onReplaceFileBlob,
+  onUpdateFile,
 }) {
   const [editing, setEditing] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -223,7 +236,13 @@ export default function Block({
                           <span className="doc-chip-icon">
                             <DocKindIcon kind={f.kind} />
                           </span>
-                          <span className="doc-chip-name">{f.name}</span>
+                          <span className="doc-chip-text">
+                            <span className="doc-chip-name">{f.name}</span>
+                            <span className="doc-chip-meta">
+                              {shortDate(fileDate(f))}
+                              {f.location ? ` · ${f.location}` : ''}
+                            </span>
+                          </span>
                         </button>
                         <BackupButton
                           saved={f.syncState === 'saved'}
@@ -311,6 +330,7 @@ export default function Block({
               saved={live.syncState === 'saved'}
               onBackup={() => onBackupFiles([live])}
               onCrop={isImage ? (blob) => onReplaceFileBlob(live.id, blob) : undefined}
+              onUpdateFile={onUpdateFile}
               onClose={() => setViewerFile(null)}
             />
           );

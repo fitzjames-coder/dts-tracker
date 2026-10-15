@@ -14,12 +14,15 @@ import {
   deleteReceipt,
   addFile,
   deleteFile,
+  updateFile,
   markFilesSaved,
   replaceFileBlob,
+  wipeAll,
 } from './db.js';
 import { reencodeToJpeg } from './lib/image.js';
 import { formatCents, centsToInput } from './lib/money.js';
 import { shareFiles } from './lib/share.js';
+import { buildReceiptsCsv, csvFilename } from './lib/csv.js';
 import TopBar from './components/TopBar.jsx';
 import BudgetTiles from './components/BudgetTiles.jsx';
 import ReceiptsBlock from './components/ReceiptsBlock.jsx';
@@ -28,6 +31,7 @@ import BlockForm from './components/BlockForm.jsx';
 import ReceiptSheet from './components/ReceiptSheet.jsx';
 import TodoSheet from './components/TodoSheet.jsx';
 import BackupSheet from './components/BackupSheet.jsx';
+import NewTripSheet from './components/NewTripSheet.jsx';
 import ExportButton, { UNLOCK_SCROLL_KEY } from './components/ExportButton.jsx';
 
 export default function App() {
@@ -44,6 +48,7 @@ export default function App() {
   const [receiptSheet, setReceiptSheet] = useState(null); // { mode, receipt }
   const [todoSheetOpen, setTodoSheetOpen] = useState(false);
   const [backupSheetOpen, setBackupSheetOpen] = useState(false);
+  const [newTripOpen, setNewTripOpen] = useState(false);
   const [navTodoBlockId, setNavTodoBlockId] = useState(null);
   // After any completed Save to Files, iOS needs a reload before the next
   // view/save. In-memory only, so it resets to false on reload.
@@ -175,6 +180,33 @@ export default function App() {
     [ensurePersist, refresh]
   );
 
+  // Build the CSV file descriptor from the current trip (used by Export and by
+  // Start new trip). Synchronous, so callers can share straight from the tap.
+  const makeCsvFile = useCallback(() => {
+    const csv = buildReceiptsCsv({
+      trip,
+      receipts,
+      voucherUsed,
+      perDiemUsed,
+      fuelUsed,
+      fileById,
+      blocks,
+      todosByBlock,
+      filesByBlock,
+    });
+    return {
+      blob: new Blob([csv], { type: 'text/csv' }),
+      name: csvFilename(trip?.name),
+      mimeType: 'text/csv',
+    };
+  }, [trip, receipts, voucherUsed, perDiemUsed, fuelUsed, fileById, blocks, todosByBlock, filesByBlock]);
+
+  // Wipe everything and reload so ensureTrip() creates a fresh, empty trip.
+  const onWipeAndReload = useCallback(async () => {
+    await wipeAll();
+    location.reload();
+  }, []);
+
   // --- Search ---------------------------------------------------------------
 
   const q = search.trim().toLowerCase();
@@ -214,6 +246,8 @@ export default function App() {
 
   const onRenameTrip = (name) => act(() => updateTrip(trip.id, { name }).then(() => setTrip((t) => ({ ...t, name }))));
   const onSaveTotals = (changes) =>
+    act(() => updateTrip(trip.id, changes).then(() => setTrip((t) => ({ ...t, ...changes }))));
+  const onSaveTripDates = (changes) =>
     act(() => updateTrip(trip.id, changes).then(() => setTrip((t) => ({ ...t, ...changes }))));
 
   const onAddBlock = (data) => act(async () => { await addBlock(trip.id, data); setAddingBlock(false); });
@@ -269,6 +303,7 @@ export default function App() {
 
   const onDeleteDoc = (id) => act(() => deleteFile(id));
   const onReplaceFileBlob = (id, blob) => act(() => replaceFileBlob(id, blob));
+  const onUpdateFile = (id, changes) => act(() => updateFile(id, changes));
 
   const onSaveNewReceipt = (fields, fileRow) =>
     act(async () => {
@@ -320,6 +355,7 @@ export default function App() {
             setReceiptSheet({ mode: 'new', receipt: null });
           }}
           onRenameTrip={onRenameTrip}
+          onSaveTripDates={onSaveTripDates}
           needsUnlock={needsUnlock}
         />
         <BudgetTiles
@@ -381,18 +417,19 @@ export default function App() {
                 onDeleteFile={onDeleteDoc}
                 onBackupFiles={onBackupFiles}
                 onReplaceFileBlob={onReplaceFileBlob}
+                onUpdateFile={onUpdateFile}
               />
             ))}
 
-            <ExportButton
-              trip={trip}
-              receipts={receipts}
-              fileById={fileById}
-              voucherUsed={voucherUsed}
-              perDiemUsed={perDiemUsed}
-              fuelUsed={fuelUsed}
-              onSaved={() => setNeedsUnlock(true)}
-            />
+            <ExportButton makeCsvFile={makeCsvFile} onSaved={() => setNeedsUnlock(true)} />
+
+            <button
+              type="button"
+              className="new-trip-btn"
+              onClick={() => setNewTripOpen(true)}
+            >
+              Start new trip
+            </button>
           </>
         )}
       </main>
@@ -417,6 +454,15 @@ export default function App() {
           files={files}
           onBackupFiles={onBackupFiles}
           onClose={() => setBackupSheetOpen(false)}
+        />
+      )}
+
+      {newTripOpen && (
+        <NewTripSheet
+          unsavedCount={unsavedCount}
+          makeCsvFile={makeCsvFile}
+          onWipe={onWipeAndReload}
+          onClose={() => setNewTripOpen(false)}
         />
       )}
 
