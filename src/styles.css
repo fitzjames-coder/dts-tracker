@@ -154,6 +154,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .trip-date-label {
@@ -172,6 +174,13 @@ textarea {
   border-radius: 6px;
   padding: 2px 6px;
   min-height: 32px;
+  /* Same overflow-proofing as the DocViewer date field. */
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .trip-date-dash {
@@ -1892,30 +1901,36 @@ textarea {
 
 .doc-meta {
   flex: 0 0 auto;
-  display: flex;
-  gap: 10px;
+  display: grid;
+  /* A grid (not flex): the fixed-width flex column let the native iOS date
+     input ignore its width and slide under Location. Grid columns clamp it. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  column-gap: 10px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
 }
 
 .doc-meta-field {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
 }
 
-.doc-meta-date {
-  flex: 0 0 150px;
-}
-
-.doc-meta-loc {
-  flex: 1 1 auto;
-}
-
+/* Both inputs fill their column exactly and can never grow past it. */
 .doc-meta .text-input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   font-size: 16px; /* >= 16px so iOS does not zoom */
+}
+
+/* The date input must not auto-size to its native control; force it to match
+   the Location input's box (padding/border/radius/height come from .text-input). */
+.doc-meta-date .text-input {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .doc-meta-label {
@@ -1927,11 +1942,8 @@ textarea {
 /* Stack the two fields on very narrow screens so neither overlaps. */
 @media (max-width: 360px) {
   .doc-meta {
-    flex-direction: column;
-    gap: 8px;
-  }
-  .doc-meta-date {
-    flex: 0 0 auto;
+    grid-template-columns: 1fr;
+    row-gap: 8px;
   }
 }
 
