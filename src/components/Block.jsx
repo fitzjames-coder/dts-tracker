@@ -5,16 +5,6 @@ import BlockForm from './BlockForm.jsx';
 import ConfirmInline from './ConfirmInline.jsx';
 import DocViewer from './DocViewer.jsx';
 import { BackupButton } from './ExportButton.jsx';
-import { shareFiles } from '../lib/share.js';
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path d="M12 3v12M8 7l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6 12v6a2 2 0 002 2h8a2 2 0 002-2v-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 const CODE_PREFIXES = ['Confirmation:', 'TANUM:', 'SATO ticket:'];
 
@@ -211,14 +201,6 @@ export default function Block({
                       <DocKindIcon kind={f.kind} />
                     </span>
                     <span className="doc-chip-name">{f.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="doc-chip-share"
-                    onClick={() => shareFiles([f])}
-                    aria-label="Share document"
-                  >
-                    <ShareIcon />
                   </button>
                   <BackupButton
                     saved={f.syncState === 'saved'}

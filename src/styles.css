@@ -1368,10 +1368,6 @@ textarea {
   border-top: 1px solid var(--line);
 }
 
-.doc-viewer-share {
-  width: 100%;
-}
-
 /* --- PDF pages (pdf.js) --------------------------------------------------- */
 
 /* In PDF mode the body scrolls vertically and stacks pages from the top. */
@@ -1537,37 +1533,20 @@ textarea {
   letter-spacing: 0.04em;
 }
 
-/* --- Document chip: share button + wrapping ------------------------------ */
+/* --- Document chip: wrap so the error line can sit below ----------------- */
 
 .doc-chip {
   flex-wrap: wrap;
   row-gap: 6px;
 }
 
-.doc-chip-share {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* --- DocViewer bottom bar with two actions ------------------------------- */
+/* --- DocViewer bottom bar (single backup control) ------------------------ */
 
 .doc-viewer-bottom {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.doc-viewer-share {
-  flex: 1 1 auto;
 }
 
 /* --- Backup sheet --------------------------------------------------------- */

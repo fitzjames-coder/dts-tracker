@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Component, Suspense, lazy, useEffect, useState } from 'react';
 import { BackupButton } from './ExportButton.jsx';
 
 // Full-screen viewer for a stored document/photo. Everything comes from the
@@ -54,32 +54,6 @@ export default function DocViewer({ file, onClose, onBackup, saved }) {
   const isImage = (file?.mimeType || '').startsWith('image/');
   const isPdf = (file?.mimeType || '') === 'application/pdf';
 
-  // Can we hand this file to the OS share / save sheet?
-  const canShare = useMemo(() => {
-    if (!file || !file.blob) return false;
-    if (typeof navigator === 'undefined' || !navigator.canShare) return false;
-    try {
-      const f = new File([file.blob], file.name || 'document', {
-        type: file.mimeType || 'application/octet-stream',
-      });
-      return navigator.canShare({ files: [f] });
-    } catch {
-      return false;
-    }
-  }, [file]);
-
-  async function onShare() {
-    try {
-      const f = new File([file.blob], file.name || 'document', {
-        type: file.mimeType || 'application/octet-stream',
-      });
-      await navigator.share({ files: [f] });
-    } catch (err) {
-      if (err && err.name === 'AbortError') return; // user cancelled the sheet
-      // Any other failure: fail quietly, the viewer stays open.
-    }
-  }
-
   if (!file) return null;
 
   return (
@@ -123,14 +97,9 @@ export default function DocViewer({ file, onClose, onBackup, saved }) {
           ))}
       </div>
 
-      {(canShare || onBackup) && (
+      {onBackup && (
         <div className="doc-viewer-bottom">
-          {canShare && (
-            <button type="button" className="btn btn-primary doc-viewer-share" onClick={onShare}>
-              Share / Save to Files
-            </button>
-          )}
-          {onBackup && <BackupButton saved={saved} onBackup={onBackup} />}
+          <BackupButton saved={saved} onBackup={onBackup} full />
         </div>
       )}
     </div>

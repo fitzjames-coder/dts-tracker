@@ -149,11 +149,11 @@ export default function App() {
     async (fileRows) => {
       ensurePersist();
       const res = await shareFiles(fileRows);
-      if (res === 'done') {
+      if (res.status === 'done') {
         await markFilesSaved(fileRows.map((f) => f.id));
         await refresh();
       }
-      return res;
+      return res; // { status, errorName }
     },
     [ensurePersist, refresh]
   );

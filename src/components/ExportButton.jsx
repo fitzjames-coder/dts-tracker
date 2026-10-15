@@ -11,7 +11,7 @@ const UNSUPPORTED_MSG = 'This browser can’t save files — update Chrome.';
 
 function SmallTick() {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
       <path
         d="M5 13l4 4L19 7"
         fill="none"
@@ -24,27 +24,37 @@ function SmallTick() {
   );
 }
 
+// Share arrow combined with a down arrow: "share this out / save to Files".
+function SaveShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+      <path d="M12 3v11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 14v3a2 2 0 002 2h10a2 2 0 002-2v-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /**
- * Red "Save" / green "✓ Saved" backup button. onBackup returns the share
- * status; on 'unsupported' an inline line is shown.
- * @param {{saved: boolean, onBackup: () => Promise<string>, full?: boolean}} props
+ * The single save/share control. Tapping it ALWAYS opens the share sheet
+ * (saved or not). Red "Save" when not backed up, green "Saved" with a tick
+ * once backed up. Status only flips to saved when the share completes.
+ *
+ * onBackup resolves to { status, errorName }. There is deliberately no local
+ * busy flag — serialisation lives in shareFiles so a button can never get
+ * stuck "in flight" after a re-render.
+ * @param {{saved: boolean, onBackup: () => Promise<{status:string,errorName:string}>, full?: boolean}} props
  */
 export function BackupButton({ saved, onBackup, full }) {
-  const [unsupported, setUnsupported] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null); // null | 'unsupported' | {failed: errorName}
 
   async function handle(e) {
     e.stopPropagation();
-    if (busy) return;
-    setBusy(true);
-    setUnsupported(false);
-    let res;
-    try {
-      res = await onBackup();
-    } finally {
-      setBusy(false);
-    }
-    if (res === 'unsupported') setUnsupported(true);
+    setNote(null); // clears on every tap
+    const res = (await onBackup()) || {};
+    if (res.status === 'unsupported') setNote('unsupported');
+    else if (res.status === 'failed') setNote({ failed: res.errorName || 'error' });
+    // 'done' / 'cancelled' leave no note.
   }
 
   return (
@@ -57,17 +67,16 @@ export function BackupButton({ saved, onBackup, full }) {
           (full ? ' backup-btn-full' : '')
         }
         onClick={handle}
-        aria-label={saved ? 'Backed up — tap to re-save' : 'Save backup'}
+        aria-label={saved ? 'Backed up — tap to save again' : 'Save to Files'}
       >
-        {saved ? (
-          <>
-            <SmallTick /> Saved
-          </>
-        ) : (
-          'Save'
-        )}
+        {saved ? <SmallTick /> : <SaveShareIcon />} {saved ? 'Saved' : 'Save'}
       </button>
-      {unsupported && <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>}
+      {note === 'unsupported' && <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>}
+      {note && note.failed && (
+        <span className="backup-unsupported">
+          Couldn’t open the share sheet ({note.failed}) — tap again.
+        </span>
+      )}
     </>
   );
 }
@@ -101,9 +110,11 @@ export default function ExportButton({
   perDiemUsed,
   fuelUsed,
 }) {
-  const [status, setStatus] = useState(''); // '', 'exported', 'unsupported'
+  const [status, setStatus] = useState(''); // '', 'exported', 'unsupported', 'failed'
+  const [errName, setErrName] = useState('');
 
   async function onExport() {
+    setStatus(''); // clears any prior message on each tap (sync; keeps activation)
     const csv = buildReceiptsCsv({
       trip,
       receipts,
@@ -119,12 +130,15 @@ export default function ExportButton({
     } catch {
       return;
     }
-    const res = await shareFiles([file]);
-    if (res === 'done') {
+    const res = (await shareFiles([file])) || {};
+    if (res.status === 'done') {
       setStatus('exported');
-      setTimeout(() => setStatus(''), 2000);
-    } else if (res === 'unsupported') {
+      setTimeout(() => setStatus((s) => (s === 'exported' ? '' : s)), 2000);
+    } else if (res.status === 'unsupported') {
       setStatus('unsupported');
+    } else if (res.status === 'failed') {
+      setErrName(res.errorName || 'error');
+      setStatus('failed');
     }
   }
 
@@ -135,6 +149,11 @@ export default function ExportButton({
       </button>
       {status === 'unsupported' && (
         <span className="backup-unsupported">{UNSUPPORTED_MSG}</span>
+      )}
+      {status === 'failed' && (
+        <span className="backup-unsupported">
+          Couldn’t open the share sheet ({errName}) — tap again.
+        </span>
       )}
     </div>
   );
