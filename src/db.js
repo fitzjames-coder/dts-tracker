@@ -321,6 +321,186 @@ export async function wipeAll() {
   });
 }
 
+// --- Import ---------------------------------------------------------------
+
+/** Highest trailing number already used by a block's file names, else 0. */
+function highestFileNo(title, names) {
+  const word = blockWord(title);
+  const re = new RegExp('^' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-(\\d+)\\.');
+  let max = 0;
+  for (const name of names) {
+    const m = re.exec(name);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return max;
+}
+
+/**
+ * Rebuild a trip from a parsed CSV (see lib/csvImport.js) in ONE transaction:
+ * wipe everything, then recreate the trip, its blocks (lines + to-dos) and its
+ * receipts. No file blobs exist in a CSV, so each expected file is recorded on
+ * the trip's `pendingFiles` list instead; attachFiles() fills them in later.
+ * Receipts are created with fileId null until their photo is reattached.
+ */
+export async function importTrip(parsed) {
+  const { trip: t, receipts = [], blocks = [] } = parsed || {};
+  await db.transaction('rw', db.trips, db.blocks, db.todos, db.receipts, db.files, async () => {
+    await Promise.all([
+      db.trips.clear(),
+      db.blocks.clear(),
+      db.todos.clear(),
+      db.receipts.clear(),
+      db.files.clear(),
+    ]);
+
+    const tripId = uid();
+    const pendingFiles = [];
+    const createdAt = now();
+
+    // Blocks in CSV order: ascending `order` keeps them top-to-bottom on screen.
+    for (let bi = 0; bi < blocks.length; bi += 1) {
+      const b = blocks[bi] || {};
+      const blockId = uid();
+      const fileNames = (b.files || []).map((f) => f.name);
+      await db.blocks.add({
+        id: blockId,
+        tripId,
+        title: b.title || '',
+        lines: Array.isArray(b.lines) ? b.lines : [],
+        order: bi,
+        open: true,
+        todoOpen: true,
+        docsOpen: false,
+        // Keep numbering above any number already used by this block's files.
+        nextFileNo: highestFileNo(b.title, fileNames) + 1,
+        createdAt,
+        updatedAt: createdAt,
+      });
+      const todos = b.todos || [];
+      for (let ti = 0; ti < todos.length; ti += 1) {
+        await db.todos.add({
+          id: uid(),
+          blockId,
+          text: todos[ti].text || '',
+          done: !!todos[ti].done,
+          order: ti,
+        });
+      }
+      for (const f of b.files || []) {
+        if (!f.name) continue;
+        pendingFiles.push({
+          name: f.name,
+          kind: 'block',
+          blockId,
+          date: f.date || '',
+          location: f.location || '',
+        });
+      }
+    }
+
+    // Receipts in CSV order (loadAll re-sorts for display).
+    for (const r of receipts) {
+      const receiptId = uid();
+      await db.receipts.add({
+        id: receiptId,
+        tripId,
+        title: r.title || '',
+        tag: r.tag || 'other',
+        amountCents: r.amountCents ?? null,
+        date: r.date || '',
+        location: r.location || '',
+        fileId: null,
+      });
+      if (r.photoFile) {
+        pendingFiles.push({
+          name: r.photoFile,
+          kind: 'receipt',
+          receiptId,
+          date: r.date || '',
+          location: r.location || '',
+        });
+      }
+    }
+
+    await db.trips.add({
+      id: tripId,
+      name: t?.name || 'Imported trip',
+      voucherCents: t?.voucherCents || 0,
+      perDiemCents: t?.perDiemCents || 0,
+      fuelCents: t?.fuelCents || 0,
+      startDate: t?.startDate || null,
+      endDate: t?.endDate || null,
+      createdAt,
+      pendingFiles,
+    });
+  });
+}
+
+/**
+ * Attach picked files to a previously imported trip. A file matches when its
+ * name EXACTLY equals an entry on the trip's pendingFiles list; matched files
+ * are stored (blob + metadata), marked "saved" (they already live in Files),
+ * removed from pendingFiles, and — for receipt photos — linked to the receipt.
+ * Unmatched picked files are ignored.
+ * @param {FileList|File[]} fileList
+ * @returns {Promise<{matched:number, unmatched:number}>}
+ */
+export async function attachFiles(fileList) {
+  const picked = Array.from(fileList || []);
+  if (!picked.length) return { matched: 0, unmatched: 0 };
+
+  return db.transaction('rw', db.trips, db.files, db.receipts, async () => {
+    const trip = await db.trips.orderBy('createdAt').first();
+    if (!trip) return { matched: 0, unmatched: picked.length };
+
+    const pending = Array.isArray(trip.pendingFiles) ? [...trip.pendingFiles] : [];
+    const savedAt = now();
+    let matched = 0;
+    let unmatched = 0;
+
+    for (const file of picked) {
+      const idx = pending.findIndex((p) => p.name === file.name);
+      if (idx === -1) {
+        unmatched += 1;
+        continue;
+      }
+      const entry = pending[idx];
+      const mimeType = file.type || 'application/octet-stream';
+      const kind =
+        mimeType === 'application/pdf' ? 'pdf' : mimeType.startsWith('image/') ? 'photo' : 'upload';
+      const fileId = uid();
+      await db.files.add({
+        id: fileId,
+        tripId: trip.id,
+        blockId: entry.kind === 'block' ? entry.blockId : null,
+        receiptId: entry.kind === 'receipt' ? entry.receiptId : null,
+        kind,
+        name: entry.name,
+        mimeType,
+        size: file.size,
+        blob: file,
+        date: entry.date || todayLocal(),
+        location: entry.location || '',
+        createdAt: now(),
+        syncState: 'saved',
+        savedAt,
+        driveFileId: null,
+      });
+      if (entry.kind === 'receipt' && entry.receiptId) {
+        await db.receipts.update(entry.receiptId, { fileId });
+      }
+      pending.splice(idx, 1);
+      matched += 1;
+    }
+
+    await db.trips.update(trip.id, { pendingFiles: pending });
+    return { matched, unmatched };
+  });
+}
+
 // --- Bulk loaders ---------------------------------------------------------
 
 export async function loadAll(tripId) {

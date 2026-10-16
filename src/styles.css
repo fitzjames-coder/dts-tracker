@@ -1979,3 +1979,50 @@ textarea {
 .new-trip-cancel {
   width: 100%;
 }
+
+/* --- Import trip from CSV -------------------------------------------------- */
+
+.import-trip-btn {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  background: none;
+  color: var(--fg);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-weight: 650;
+}
+
+/* The "N files can be reattached" line at the top of the Receipts area. */
+.reattach-line {
+  width: 100%;
+  text-align: left;
+  border: 1px dashed var(--accent);
+  background: none;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.import-error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.import-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.import-result {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.import-reattach-btn,
+.import-done-btn {
+  width: 100%;
+}
