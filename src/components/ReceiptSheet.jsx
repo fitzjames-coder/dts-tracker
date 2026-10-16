@@ -42,7 +42,7 @@ function OtherIcon() {
 
 const HINTS = {
   other: 'voucher only',
-  food: 'per diem + voucher',
+  food: 'M&IE + voucher',
   fuel: 'fuel + voucher',
 };
 
