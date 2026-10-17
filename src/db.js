@@ -51,6 +51,7 @@ export async function ensureTrip() {
   const trip = {
     id: uid(),
     name: 'New trip',
+    gtcLimitCents: 0,
     voucherCents: 0,
     perDiemCents: 0,
     fuelCents: 0,
@@ -179,6 +180,9 @@ export async function addReceipt(tripId, fields, fileRow) {
       amountCents: fields.amountCents ?? null,
       date: fields.date,
       location: fields.location || '',
+      // Which budgets this receipt reduces. Default both on.
+      onGtc: fields.onGtc !== false,
+      onVoucher: fields.onVoucher !== false,
       fileId,
     });
   });
@@ -412,6 +416,8 @@ export async function importTrip(parsed) {
         amountCents: r.amountCents ?? null,
         date: r.date || '',
         location: r.location || '',
+        onGtc: r.onGtc !== false,
+        onVoucher: r.onVoucher !== false,
         fileId: null,
       });
       if (r.photoFile) {
@@ -428,6 +434,7 @@ export async function importTrip(parsed) {
     await db.trips.add({
       id: tripId,
       name: t?.name || 'Imported trip',
+      gtcLimitCents: t?.gtcLimitCents || 0,
       voucherCents: t?.voucherCents || 0,
       perDiemCents: t?.perDiemCents || 0,
       fuelCents: t?.fuelCents || 0,

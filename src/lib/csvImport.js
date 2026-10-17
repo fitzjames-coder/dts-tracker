@@ -96,9 +96,10 @@ function isBlankRow(row) {
  * @param {string} text raw file text
  * @returns {{
  *   trip: {name:string,startDate:string|null,endDate:string|null,
- *          voucherCents:number,perDiemCents:number,fuelCents:number},
+ *          gtcLimitCents:number,voucherCents:number,perDiemCents:number,fuelCents:number},
  *   receipts: Array<{date:string,title:string,tag:string,
- *          amountCents:number|null,location:string,photoFile:string}>,
+ *          amountCents:number|null,onGtc:boolean,onVoucher:boolean,
+ *          location:string,photoFile:string}>,
  *   blocks: Array<{title:string,lines:string[],
  *          todos:Array<{text:string,done:boolean}>,
  *          files:Array<{name:string,date:string,location:string}>}>,
@@ -115,6 +116,7 @@ export function parseTripCsv(text) {
     name: '',
     startDate: null,
     endDate: null,
+    gtcLimitCents: 0,
     voucherCents: 0,
     perDiemCents: 0,
     fuelCents: 0,
@@ -136,7 +138,9 @@ export function parseTripCsv(text) {
   // --- Budget totals: the Total column (index 1) as cents. Used/Remaining ignored. ---
   for (; i < rows.length; i += 1) {
     const key = cell(rows[i], 0).trim();
-    if (key === 'Voucher') trip.voucherCents = moneyToCents(cell(rows[i], 1)) || 0;
+    // A missing GTC row leaves the default 0 (older exports had no GTC).
+    if (key === 'GTC') trip.gtcLimitCents = moneyToCents(cell(rows[i], 1)) || 0;
+    else if (key === 'Voucher') trip.voucherCents = moneyToCents(cell(rows[i], 1)) || 0;
     // Accept the current "M&IE" label and the old "Per diem" one (older exports).
     else if (key === 'M&IE' || key === 'Per diem')
       trip.perDiemCents = moneyToCents(cell(rows[i], 1)) || 0;
@@ -147,20 +151,34 @@ export function parseTripCsv(text) {
 
   // --- Receipts: header row was `Date,Title,Tag,Amount,...`. ---
   if (cell(rows[i], 0).trim() === 'Date' && cell(rows[i], 1).trim() === 'Title') {
+    // Read columns by header name so both the current layout (with GTC/Voucher
+    // columns) and older exports (without them) import correctly.
+    const col = {};
+    rows[i].forEach((c, idx) => {
+      const key = String(c).trim();
+      if (key && col[key] == null) col[key] = idx;
+    });
+    const get = (row, name) => (col[name] == null ? '' : cell(row, col[name]));
+    // A missing column means the budget was ticked (Yes/Yes by default).
+    const yesNo = (row, name) =>
+      col[name] == null ? true : get(row, name).trim().toLowerCase() !== 'no';
+
     i += 1; // skip header
     for (; i < rows.length; i += 1) {
       const row = rows[i];
       if (isBlankRow(row)) break;
       const first = cell(row, 0).trim();
       if (first === 'Receipts total' || first === 'Blocks') break;
-      const title = cell(row, 1);
+      const title = get(row, 'Title');
       receipts.push({
-        date: cell(row, 0),
+        date: get(row, 'Date'),
         title: title === 'Untitled receipt' ? '' : title,
-        tag: TAG_FROM_LABEL[cell(row, 2).trim()] || 'other',
-        amountCents: moneyToCents(cell(row, 3)),
-        location: cell(row, 5),
-        photoFile: cell(row, 6),
+        tag: TAG_FROM_LABEL[get(row, 'Tag').trim()] || 'other',
+        amountCents: moneyToCents(get(row, 'Amount')),
+        onGtc: yesNo(row, 'GTC'),
+        onVoucher: yesNo(row, 'Voucher'),
+        location: get(row, 'Location'),
+        photoFile: get(row, 'Photo file'),
       });
     }
   }

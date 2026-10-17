@@ -364,8 +364,8 @@ textarea {
 
 .tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px;
   margin-top: 10px;
 }
 
@@ -373,7 +373,7 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 8px 8px 10px;
+  padding: 8px 6px 10px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -381,19 +381,30 @@ textarea {
 }
 
 .tile-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.tile-icon {
+  flex-shrink: 0;
 }
 
 .tile-remaining {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: 19px;
+  /* Shrink with the viewport so "$12,345.67" stays on one line even with four
+     tiles in a 375px-wide row; grows back up on wider screens. */
+  font-size: clamp(10px, 2.9vw, 19px);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -687,6 +698,19 @@ textarea {
 }
 .tag-chip.tag-other {
   background: var(--other);
+}
+
+/* Small text badge on a receipt row when it counts against only one of GTC /
+   Voucher (no badge when both are ticked). */
+.split-badge {
+  font-weight: 650;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .receipt-right {
@@ -1284,6 +1308,35 @@ textarea {
   color: var(--muted);
 }
 
+/* GTC / Voucher checkboxes under Amount. */
+.split-boxes {
+  display: flex;
+  gap: 18px;
+  margin-top: 2px;
+}
+
+.split-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.split-box input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.split-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
 .saves-as {
   font-size: 12px;
   color: var(--muted);
@@ -1375,7 +1428,7 @@ textarea {
   display: block;
 }
 
-/* --- Budget tile: inline total-change confirm ---------------------------- */
+/* --- Budget total-change confirm: one full-width panel below the tile row - */
 
 .tile-confirm {
   margin-top: 8px;
@@ -1388,22 +1441,28 @@ textarea {
   padding: 8px;
 }
 
+/* Span the whole row of tiles so the buttons are never trapped under a
+   neighbouring tile. */
+.tile-confirm-panel {
+  width: 100%;
+}
+
 .tile-confirm-msg {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .tile-confirm-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tile-confirm-btn {
-  flex: 1 1 auto;
-  min-height: 36px;
-  padding: 6px 8px;
-  font-size: 13px;
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 14px;
 }
 
 /* --- Full-screen document viewer ----------------------------------------- */

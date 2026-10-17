@@ -46,7 +46,11 @@ export default function ReceiptsBlock({ receipts, fileById, onOpenReceipt, onBac
             <p className="empty-note">No receipts yet. Tap the gold button to add one.</p>
           ) : (
             <ul className="receipt-list">
-              {receipts.map((r) => (
+              {receipts.map((r) => {
+                const g = r.onGtc !== false;
+                const v = r.onVoucher !== false;
+                const splitBadge = g && !v ? 'GTC' : v && !g ? 'Voucher' : null;
+                return (
                 <li key={r.id}>
                   <button
                     type="button"
@@ -60,6 +64,7 @@ export default function ReceiptsBlock({ receipts, fileById, onOpenReceipt, onBac
                       </span>
                       <span className="receipt-sub">
                         <span className={'tag-chip ' + tagClass(r.tag)}>{r.tag}</span>
+                        {splitBadge && <span className="split-badge">{splitBadge}</span>}
                         <span className="receipt-date">{r.date}</span>
                         {r.location && <span className="receipt-loc">· {r.location}</span>}
                       </span>
@@ -77,7 +82,8 @@ export default function ReceiptsBlock({ receipts, fileById, onOpenReceipt, onBac
                     </span>
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

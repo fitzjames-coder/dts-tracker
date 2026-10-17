@@ -42,11 +42,16 @@ function fileStamp() {
 }
 
 const TAG_LABEL = { food: 'Food', fuel: 'Fuel', other: 'Other' };
-const COUNTS_AGAINST = {
-  food: 'M&IE + Voucher',
-  fuel: 'Fuel + Voucher',
-  other: 'Voucher only',
-};
+
+/** The budget tiles a receipt reduces, e.g. "GTC; Voucher; M&IE". */
+function countsAgainst(r) {
+  const parts = [];
+  if (r.onGtc !== false) parts.push('GTC');
+  if (r.onVoucher !== false) parts.push('Voucher');
+  if (r.tag === 'food') parts.push('M&IE');
+  else if (r.tag === 'fuel') parts.push('Fuel');
+  return parts.join('; ');
+}
 
 /**
  * @param {{
@@ -63,6 +68,7 @@ const COUNTS_AGAINST = {
 export function buildReceiptsCsv({
   trip,
   receipts,
+  gtcUsed,
   voucherUsed,
   perDiemUsed,
   fuelUsed,
@@ -81,6 +87,12 @@ export function buildReceiptsCsv({
   rows.push([]);
 
   rows.push([q('Budget'), q('Total'), q('Used'), q('Remaining')]);
+  rows.push([
+    q('GTC'),
+    money(trip?.gtcLimitCents),
+    money(gtcUsed),
+    money((trip?.gtcLimitCents || 0) - (gtcUsed || 0)),
+  ]);
   rows.push([
     q('Voucher'),
     money(trip?.voucherCents),
@@ -107,6 +119,8 @@ export function buildReceiptsCsv({
     q('Title'),
     q('Tag'),
     q('Amount'),
+    q('GTC'),
+    q('Voucher'),
     q('Counts against'),
     q('Location'),
     q('Photo file'),
@@ -129,7 +143,9 @@ export function buildReceiptsCsv({
       q(r.title ? r.title : 'Untitled receipt'),
       q(TAG_LABEL[r.tag] || 'Other'),
       hasAmount ? money(r.amountCents) : '', // blank cell when empty
-      q(COUNTS_AGAINST[r.tag] || 'Voucher only'),
+      q(r.onGtc !== false ? 'Yes' : 'No'),
+      q(r.onVoucher !== false ? 'Yes' : 'No'),
+      q(countsAgainst(r)),
       q(r.location || ''),
       q(file ? file.name : ''),
       q(backedUp),
