@@ -137,7 +137,9 @@ export function parseTripCsv(text) {
   for (; i < rows.length; i += 1) {
     const key = cell(rows[i], 0).trim();
     if (key === 'Voucher') trip.voucherCents = moneyToCents(cell(rows[i], 1)) || 0;
-    else if (key === 'Per diem') trip.perDiemCents = moneyToCents(cell(rows[i], 1)) || 0;
+    // Accept the current "M&IE" label and the old "Per diem" one (older exports).
+    else if (key === 'M&IE' || key === 'Per diem')
+      trip.perDiemCents = moneyToCents(cell(rows[i], 1)) || 0;
     else if (key === 'Fuel') trip.fuelCents = moneyToCents(cell(rows[i], 1)) || 0;
     else if (key === 'Date' && cell(rows[i], 1).trim() === 'Title') break; // receipts header
     else if (key === 'Blocks') break;

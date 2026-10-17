@@ -112,7 +112,7 @@ export default function BudgetTiles({ trip, voucherUsed, perDiemUsed, fuelUsed, 
         onSaveTotal={(c) => onSaveTotals({ voucherCents: c })}
       />
       <Tile
-        label="Per diem"
+        label="M&IE"
         totalCents={trip.perDiemCents}
         usedCents={perDiemUsed}
         onSaveTotal={(c) => onSaveTotals({ perDiemCents: c })}

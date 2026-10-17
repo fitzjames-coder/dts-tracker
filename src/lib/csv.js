@@ -43,7 +43,7 @@ function fileStamp() {
 
 const TAG_LABEL = { food: 'Food', fuel: 'Fuel', other: 'Other' };
 const COUNTS_AGAINST = {
-  food: 'Per diem + Voucher',
+  food: 'M&IE + Voucher',
   fuel: 'Fuel + Voucher',
   other: 'Voucher only',
 };
@@ -88,7 +88,7 @@ export function buildReceiptsCsv({
     money((trip?.voucherCents || 0) - (voucherUsed || 0)),
   ]);
   rows.push([
-    q('Per diem'),
+    q('M&IE'),
     money(trip?.perDiemCents),
     money(perDiemUsed),
     money((trip?.perDiemCents || 0) - (perDiemUsed || 0)),
