@@ -53,6 +53,11 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const [amount, setAmount] = useState(isEdit ? centsToInput(receipt?.amountCents) : '');
   const [date, setDate] = useState(receipt?.date || todayStr());
   const [location, setLocation] = useState(receipt?.location || '');
+  // Which budgets this receipt counts against. Both on by default; missing
+  // values on an older receipt read as on. At least one must stay ticked.
+  const [onGtc, setOnGtc] = useState(receipt ? receipt.onGtc !== false : true);
+  const [onVoucher, setOnVoucher] = useState(receipt ? receipt.onVoucher !== false : true);
+  const [splitHint, setSplitHint] = useState(false);
   const [imageBlob, setImageBlob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
@@ -118,8 +123,34 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
   const amountCents = parseAmountToCents(amount);
   const filename = receiptFilename({ date, tag, amountCents, title });
 
+  // Tick/untick a budget box, but never let both end up off.
+  function setGtc(next) {
+    if (!next && !onVoucher) {
+      setSplitHint(true);
+      return;
+    }
+    setOnGtc(next);
+    setSplitHint(false);
+  }
+  function setVoucher(next) {
+    if (!next && !onGtc) {
+      setSplitHint(true);
+      return;
+    }
+    setOnVoucher(next);
+    setSplitHint(false);
+  }
+
   function save() {
-    const fields = { title: title.trim(), tag, amountCents, date, location: location.trim() };
+    const fields = {
+      title: title.trim(),
+      tag,
+      amountCents,
+      date,
+      location: location.trim(),
+      onGtc,
+      onVoucher,
+    };
     if (isEdit) {
       onSaveEdit(receipt.id, fields);
     } else {
@@ -277,6 +308,29 @@ export default function ReceiptSheet({ mode, receipt, existingFile, onClose, onS
             </div>
             <span className="amount-hint">{HINTS[tag]}</span>
           </label>
+
+          <div className="field">
+            <span className="field-label">Counts against</span>
+            <div className="split-boxes">
+              <label className="split-box">
+                <input
+                  type="checkbox"
+                  checked={onGtc}
+                  onChange={(e) => setGtc(e.target.checked)}
+                />
+                <span>GTC</span>
+              </label>
+              <label className="split-box">
+                <input
+                  type="checkbox"
+                  checked={onVoucher}
+                  onChange={(e) => setVoucher(e.target.checked)}
+                />
+                <span>Voucher</span>
+              </label>
+            </div>
+            {splitHint && <span className="split-hint">Pick at least one</span>}
+          </div>
 
           <p className="saves-as">Saves as {filename}</p>
 

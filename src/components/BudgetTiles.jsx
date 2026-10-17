@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatCents, formatSignedCents, centsToInput, parseAmountToCents } from '../lib/money.js';
 
-function Tile({ label, totalCents, usedCents, onSaveTotal }) {
+function CardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" className="tile-icon">
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <line x1="2.5" y1="9.5" x2="21.5" y2="9.5" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function Tile({ label, icon, totalCents, usedCents, onSaveTotal }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [pendingCents, setPendingCents] = useState(null); // confirm in progress
@@ -49,7 +58,10 @@ function Tile({ label, totalCents, usedCents, onSaveTotal }) {
 
   return (
     <div className={'tile' + (over ? ' tile-over' : '')}>
-      <div className="tile-label">{label}</div>
+      <div className="tile-label">
+        {icon}
+        {label}
+      </div>
       <div className={'tile-remaining' + (over ? ' tile-remaining-over' : '')}>
         {formatSignedCents(remaining)}
       </div>
@@ -101,10 +113,17 @@ function Tile({ label, totalCents, usedCents, onSaveTotal }) {
   );
 }
 
-export default function BudgetTiles({ trip, voucherUsed, perDiemUsed, fuelUsed, onSaveTotals }) {
+export default function BudgetTiles({ trip, gtcUsed, voucherUsed, perDiemUsed, fuelUsed, onSaveTotals }) {
   if (!trip) return null;
   return (
     <div className="tiles">
+      <Tile
+        label="GTC"
+        icon={<CardIcon />}
+        totalCents={trip.gtcLimitCents || 0}
+        usedCents={gtcUsed}
+        onSaveTotal={(c) => onSaveTotals({ gtcLimitCents: c })}
+      />
       <Tile
         label="Voucher"
         totalCents={trip.voucherCents}

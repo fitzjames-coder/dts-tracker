@@ -155,8 +155,20 @@ export default function App() {
   const openTodoCount = useMemo(() => todos.filter((t) => !t.done).length, [todos]);
   const openTodos = useMemo(() => todos.filter((t) => !t.done), [todos]);
 
+  // GTC and Voucher count the receipts whose matching box is ticked (a missing
+  // value on an older receipt reads as ticked). M&IE and Fuel count by tag.
+  const gtcUsed = useMemo(
+    () =>
+      receipts
+        .filter((r) => r.onGtc !== false)
+        .reduce((s, r) => s + (r.amountCents || 0), 0),
+    [receipts]
+  );
   const voucherUsed = useMemo(
-    () => receipts.reduce((s, r) => s + (r.amountCents || 0), 0),
+    () =>
+      receipts
+        .filter((r) => r.onVoucher !== false)
+        .reduce((s, r) => s + (r.amountCents || 0), 0),
     [receipts]
   );
   const perDiemUsed = useMemo(
@@ -197,6 +209,7 @@ export default function App() {
     const csv = buildReceiptsCsv({
       trip,
       receipts,
+      gtcUsed,
       voucherUsed,
       perDiemUsed,
       fuelUsed,
@@ -210,7 +223,7 @@ export default function App() {
       name: csvFilename(trip?.name),
       mimeType: 'text/csv',
     };
-  }, [trip, receipts, voucherUsed, perDiemUsed, fuelUsed, fileById, blocks, todosByBlock, filesByBlock]);
+  }, [trip, receipts, gtcUsed, voucherUsed, perDiemUsed, fuelUsed, fileById, blocks, todosByBlock, filesByBlock]);
 
   // Wipe everything and reload so ensureTrip() creates a fresh, empty trip.
   const onWipeAndReload = useCallback(async () => {
@@ -440,6 +453,7 @@ export default function App() {
         />
         <BudgetTiles
           trip={trip}
+          gtcUsed={gtcUsed}
           voucherUsed={voucherUsed}
           perDiemUsed={perDiemUsed}
           fuelUsed={fuelUsed}
